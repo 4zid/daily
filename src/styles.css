@@ -174,7 +174,7 @@
   }
 }
 
-[data-view='terapeuta'] {
+[data-role='therapist'] {
   --accent: var(--therapist);
   --accent-soft: var(--therapist-soft);
   --accent-deep: var(--therapist-deep);
@@ -692,7 +692,7 @@ svg {
   padding: var(--gap);
 }
 
-.app[data-view='terapeuta'] {
+.app[data-view='informe'] {
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
 }
 
@@ -887,7 +887,7 @@ svg {
     #07130d;
 }
 
-[data-view='terapeuta'] .promo {
+[data-role='therapist'] .promo {
   background:
     radial-gradient(120% 90% at 100% 100%, color-mix(in srgb, var(--accent) 80%, #000) 0%, transparent 60%),
     radial-gradient(80% 60% at 0% 0%, color-mix(in srgb, var(--accent) 35%, #000) 0%, transparent 70%),
@@ -2017,23 +2017,49 @@ svg {
 
 /* ═════════════════════════ Informe del terapeuta ═════════════════════════ */
 
-.source-banner {
+.notice {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px 12px;
   padding: 10px 10px 10px 20px;
-  border-radius: 999px;
+  border-radius: 24px;
   background: var(--accent-soft);
   font-size: 14px;
 }
 
-.source-banner strong {
+.notice b {
   font-weight: 600;
 }
 
-.app[data-view='terapeuta'] .main-inner {
+.notice-text {
+  flex: 1 1 260px;
+}
+
+.notice.is-error {
+  background: var(--danger-soft);
+}
+
+.notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* Mientras se carga una semana, lo anterior queda atenuado. */
+.day-strip,
+.main-inner {
+  transition: opacity 0.2s;
+}
+
+.day-strip.is-loading,
+.main-inner.is-loading {
+  opacity: 0.55;
+}
+
+.app[data-view='informe'] .main-inner {
   max-width: 1180px;
 }
 
@@ -2849,12 +2875,589 @@ dialog.modal::backdrop {
   }
 }
 
+/* ═════════════════════════ Cuentas: ingreso y registro ═════════════════════════ */
+
+.auth {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.85fr) minmax(0, 1.15fr);
+  gap: var(--gap);
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--gap);
+}
+
+.auth-aside {
+  position: sticky;
+  top: var(--gap);
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 40px;
+  height: calc(100dvh - var(--gap) * 2);
+  min-height: 560px;
+  padding: 30px 32px 28px;
+  border-radius: var(--r-xl);
+  color: #fff;
+  background:
+    radial-gradient(120% 80% at 100% 100%, color-mix(in srgb, var(--accent) 80%, #000) 0%, transparent 60%),
+    radial-gradient(90% 60% at 0% 0%, color-mix(in srgb, var(--accent) 35%, #000) 0%, transparent 70%),
+    #07130d;
+}
+
+[data-role='therapist'] .auth-aside {
+  background:
+    radial-gradient(120% 80% at 100% 100%, color-mix(in srgb, var(--accent) 85%, #000) 0%, transparent 60%),
+    radial-gradient(90% 60% at 0% 0%, color-mix(in srgb, var(--accent) 35%, #000) 0%, transparent 70%),
+    #08082a;
+}
+
+.auth-aside .brand {
+  padding: 0;
+}
+
+.auth-aside .brand-mark {
+  background: #fff;
+  color: #0c0c0e;
+  box-shadow: none;
+}
+
+.auth-art {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+}
+
+.auth-art circle {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.13);
+}
+
+.auth-art circle.fill {
+  fill: rgba(255, 255, 255, 0.6);
+  stroke: none;
+}
+
+.auth-title {
+  max-width: 520px;
+  font-size: 40px;
+  font-weight: 300;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+}
+
+.auth-title b {
+  font-weight: 500;
+}
+
+.auth-points {
+  display: grid;
+  gap: 14px;
+  max-width: 440px;
+  margin: 30px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 15px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.auth-points li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.auth-point-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.auth-point-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.auth-aside-foot {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.auth-main {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 20px;
+  padding: 24px 0;
+}
+
+.auth-mobile-brand {
+  display: none;
+}
+
+.auth-tray,
+.splash-card {
+  width: min(440px, 100%);
+}
+
+.auth-form {
+  display: grid;
+  gap: 16px;
+  padding: 28px 28px 24px;
+}
+
+.auth-head {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.auth-head h1 {
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.auth-foot {
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 12px 8px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.auth-message {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 4px 0;
+  font-size: 14px;
+  text-align: center;
+  color: var(--text-2);
+}
+
+.auth-message b {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.field > label {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+
+.link-btn:hover {
+  text-decoration-color: currentColor;
+}
+
+.link-btn.forgot {
+  justify-self: start;
+  margin-top: -6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-2);
+}
+
+.btn-block {
+  width: 100%;
+  height: 50px;
+  font-size: 15px;
+}
+
+.form-error {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.password-field {
+  position: relative;
+}
+
+.password-field .input {
+  padding-right: 52px;
+}
+
+.password-field .circle-btn {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+}
+
+.code-input {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  letter-spacing: 0.12em;
+}
+
+.code-input::placeholder {
+  font-family: var(--font);
+  letter-spacing: normal;
+}
+
+.check-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.check-field input {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin: 1px 0 0;
+  accent-color: var(--ink);
+}
+
+.check-field b {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.role-pick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.role-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.role-option:hover {
+  border-color: var(--border-strong);
+}
+
+.role-option svg {
+  width: 20px;
+  height: 20px;
+  color: var(--text-3);
+}
+
+.role-option b {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.role-option small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-3);
+}
+
+.role-option[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.role-option[aria-checked='true'] svg {
+  color: var(--accent);
+}
+
+.invite-block {
+  display: grid;
+  gap: 8px;
+}
+
+.invite-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 18px;
+  background: var(--accent-soft);
+}
+
+.invite-card > span:nth-child(2) {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.invite-card small {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.invite-card b {
+  font-weight: 500;
+}
+
+.invite-card .soft-pill,
+.invite-card .initials {
+  background: var(--surface);
+}
+
+.splash {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 24px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 16px;
+}
+
+.splash[role='status'] .brand {
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* ═════════════════════════ Pacientes e invitaciones ═════════════════════════ */
+
+.initials {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Ocupa lo mismo que un ícono para que los textos queden alineados. */
+.nav-item .initials {
+  width: 28px;
+  height: 28px;
+  margin: -4px;
+  font-size: 11px;
+}
+
+.nav-item[aria-current='page'] .initials {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.nav-empty {
+  margin: 0 10px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.welcome-card {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 44px 28px;
+  text-align: center;
+}
+
+.steps {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  color: var(--text-2);
+}
+
+.steps b {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mobile-bar .menu-wrap {
+  justify-self: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.patient-switch {
+  max-width: 100%;
+  padding: 0 12px 0 16px;
+}
+
+.patient-switch span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-section .segmented {
+  justify-self: start;
+}
+
+.modal-section .modal-lead {
+  font-size: 16px;
+  color: var(--text);
+}
+
+.modal-section p b {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.inline-field {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-field .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.inline-field .btn {
+  height: 46px;
+}
+
+.invite-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.invite-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0;
+}
+
+.invite-row + .invite-row {
+  border-top: 1px solid var(--line);
+}
+
+.invite-main {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.invite-main b {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invite-main small {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.code {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  letter-spacing: 0.06em;
+}
+
+@media (max-width: 900px) {
+  .auth {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .auth-aside {
+    display: none;
+  }
+
+  .auth-mobile-brand {
+    display: block;
+  }
+
+  .auth-main {
+    align-content: start;
+    padding: 12px 0 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-form {
+    padding: 22px 18px 18px;
+  }
+
+  .auth-head h1 {
+    font-size: 24px;
+  }
+
+  .role-option {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .welcome-card {
+    padding: 32px 20px;
+  }
+}
+
 /* ═════════════════════════ Responsive ═════════════════════════ */
 
 /* Pantallas medianas: el chat pasa a un panel flotante. */
 @media (max-width: 1320px) {
   .app,
-  .app[data-view='terapeuta'] {
+  .app[data-view='informe'] {
     grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   }
 
@@ -2947,7 +3550,7 @@ dialog.modal::backdrop {
   }
 
   .app,
-  .app[data-view='terapeuta'] {
+  .app[data-view='informe'] {
     display: block;
     padding: 0;
   }
@@ -3253,8 +3856,9 @@ dialog.modal::backdrop {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .source-banner {
+  .notice {
     border-radius: 22px;
+    padding: 12px 12px 12px 18px;
   }
 
   .composer .chip-static {
@@ -3322,7 +3926,7 @@ dialog.modal::backdrop {
   }
 
   .app,
-  .app[data-view='terapeuta'] {
+  .app[data-view='informe'] {
     display: block;
     padding: 0;
   }
@@ -3332,7 +3936,7 @@ dialog.modal::backdrop {
   .assistant-col,
   .fab,
   .no-print,
-  .source-banner {
+  .notice {
     display: none !important;
   }
 

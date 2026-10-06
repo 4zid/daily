@@ -145,15 +145,6 @@ export function weekStats(days: Record<string, DayLog>, monday: string): WeekSta
   };
 }
 
-/** Semanas (lunes) que tienen al menos un registro, de la más reciente a la más vieja. */
-export function weeksWithData(days: Record<string, DayLog>, weekStartOf: (iso: string) => string): string[] {
-  const set = new Set<string>();
-  for (const day of Object.values(days)) {
-    if (day.entries.length || day.reflection || day.mood) set.add(weekStartOf(day.date));
-  }
-  return [...set].sort().reverse();
-}
-
 export function countWeekEntries(days: Record<string, DayLog>, monday: string): number {
   return weekDays(monday).reduce((sum, d) => sum + (days[d]?.entries.length ?? 0), 0);
 }

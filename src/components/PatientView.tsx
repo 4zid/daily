@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Ellipsis, NotebookPen, Send, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ChartColumn, ChevronLeft, ChevronRight, Ellipsis, NotebookPen, Sparkles } from 'lucide-react';
 import type { DayLog, Entry } from '../types';
 import { getCategory } from '../lib/categories';
 import {
@@ -12,31 +12,38 @@ import {
   weekRangeLabel,
   weekdayShort,
 } from '../lib/date';
-import { actions } from '../lib/store';
+import { actions } from '../lib/cloud';
 import { average, withDurations } from '../lib/stats';
 import { CategoryAvatar, Menu, MoodIcon, MoodPicker, Scores } from './common';
 import { EntryForm } from './EntryForm';
 
 export function PatientView({
   days,
+  status,
   week,
   selectedDate,
   patientName,
   onWeekStep,
   onToday,
   onSelectDate,
-  onShare,
+  onOpenReport,
+  onRetry,
   onDeleted,
+  banner,
 }: {
   days: Record<string, DayLog>;
+  status: 'loading' | 'ready' | 'error';
   week: string;
   selectedDate: string;
   patientName: string;
   onWeekStep: (step: number) => void;
   onToday: () => void;
   onSelectDate: (date: string) => void;
-  onShare: () => void;
+  onOpenReport: () => void;
+  onRetry: () => void;
   onDeleted: (date: string, entry: Entry) => void;
+  /** Aviso opcional debajo del encabezado. */
+  banner?: ReactNode;
 }) {
   const today = todayISO();
   const dates = weekDays(week);
@@ -68,14 +75,25 @@ export function PatientView({
           <button type="button" className="btn" onClick={onToday}>
             Hoy
           </button>
-          <button type="button" className="btn btn-primary" onClick={onShare}>
-            <Send aria-hidden />
-            Compartir
+          <button type="button" className="btn btn-primary" onClick={onOpenReport}>
+            <ChartColumn aria-hidden />
+            Ver informe
           </button>
         </div>
       </header>
 
-      <nav className="day-strip" aria-label="Días de la semana">
+      {banner}
+
+      {status === 'error' && (
+        <div className="notice is-error" role="alert">
+          <span>No pudimos cargar esta semana. Revisá tu conexión.</span>
+          <button type="button" className="btn btn-sm" onClick={onRetry}>
+            Reintentar
+          </button>
+        </div>
+      )}
+
+      <nav className={`day-strip${status === 'loading' ? ' is-loading' : ''}`} aria-label="Días de la semana" aria-busy={status === 'loading'}>
         {dates.map((date) => {
           const day = days[date];
           const count = day?.entries.length ?? 0;

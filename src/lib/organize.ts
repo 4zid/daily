@@ -2,6 +2,7 @@ import type { Entry, OrganizedDay } from '../types';
 import { isCategoryId, isMood, isRating } from './categories';
 import { normalizeTime } from './date';
 import { organizeBasic } from './basicParser';
+import { accessToken } from './auth';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -49,12 +50,13 @@ function sanitize(raw: OrganizedDay): OrganizedDay {
   };
 }
 
-async function callApi(req: OrganizeRequest, accessCode: string): Promise<OrganizedDay> {
+async function callApi(req: OrganizeRequest): Promise<OrganizedDay> {
+  const token = await accessToken();
   let res: Response;
   try {
     res = await fetch('/api/organize', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-access-code': accessCode },
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify(req),
     });
   } catch {
@@ -65,7 +67,7 @@ async function callApi(req: OrganizeRequest, accessCode: string): Promise<Organi
     throw new ApiUnavailable('La IA no está configurada en este servidor.');
   }
   if (res.status === 401) {
-    throw new Error('El código de acceso para la IA no es correcto. Revisalo en Ajustes.');
+    throw new Error('Tu sesión venció. Volvé a ingresar para usar la IA.');
   }
   if (!res.ok || !body) {
     throw new Error(body?.message ?? 'No pude organizar tu día. Probá de nuevo en un momento.');
@@ -77,9 +79,9 @@ async function callApi(req: OrganizeRequest, accessCode: string): Promise<Organi
  * Organiza el relato con la IA. Si el servidor no tiene la IA configurada
  * (o la app corre sin backend), usa el modo básico local.
  */
-export async function organizeDay(req: OrganizeRequest, accessCode: string): Promise<OrganizeResult> {
+export async function organizeDay(req: OrganizeRequest): Promise<OrganizeResult> {
   try {
-    const result = await callApi(req, accessCode);
+    const result = await callApi(req);
     return { ...sanitize(result), mode: 'ia' };
   } catch (error) {
     if (!(error instanceof ApiUnavailable)) throw error;

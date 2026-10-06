@@ -1,9 +1,23 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
+import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 // Función serverless (Vercel) que ordena el relato del día en actividades.
 // En desarrollo la sirve el plugin de vite.config.ts con este mismo handler.
+
+// Mismos valores públicos que usa la app (src/lib/supabase.ts).
+const SUPABASE_URL = process.env.SUPABASE_URL ?? 'https://kiifochsbrbuhyrrmwsv.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_ApxSFOfQ-VBD-Zbb5Cs9NQ_TCzvVWIf';
+
+/** Devuelve el id del usuario si el token de sesión es válido. */
+async function verifySession(request: Request): Promise<string | null> {
+  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+  if (!token) return null;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+  const { data, error } = await supabase.auth.getUser(token);
+  return error ? null : (data.user?.id ?? null);
+}
 
 // Mantener sincronizado con src/lib/categories.ts.
 const CATEGORY_IDS = [
@@ -102,13 +116,9 @@ export async function POST(request: Request): Promise<Response> {
     return json({ error: 'not_configured', message: 'Falta configurar ANTHROPIC_API_KEY.' }, 503);
   }
 
-  const accessCode = process.env.APP_ACCESS_CODE;
-  // Publicada en Vercel, la IA no responde sin código: así nadie más gasta tu clave.
-  if (!accessCode && process.env.VERCEL) {
-    return json({ error: 'not_configured', message: 'Falta configurar APP_ACCESS_CODE.' }, 503);
-  }
-  if (accessCode && request.headers.get('x-access-code') !== accessCode) {
-    return json({ error: 'unauthorized', message: 'Código de acceso incorrecto.' }, 401);
+  // Solo usuarios con sesión iniciada: así nadie más gasta tu clave.
+  if (!(await verifySession(request))) {
+    return json({ error: 'unauthorized', message: 'Tu sesión venció. Volvé a ingresar.' }, 401);
   }
 
   const parsedBody = RequestSchema.safeParse(await request.json().catch(() => null));

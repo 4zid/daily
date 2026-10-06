@@ -40,9 +40,9 @@ async function toRequest(req: IncomingMessage): Promise<Request> {
 }
 
 export default defineConfig(({ mode }) => {
-  // Expone ANTHROPIC_API_KEY y APP_ACCESS_CODE de .env.local al handler (nunca al navegador).
+  // Expone las variables del servidor de .env.local al handler (nunca al navegador).
   const env = loadEnv(mode, process.cwd(), '');
-  for (const key of ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'APP_ACCESS_CODE']) {
+  for (const key of ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY']) {
     if (env[key] && !process.env[key]) process.env[key] = env[key];
   }
   return {

@@ -39,25 +39,6 @@ export interface DayLog {
   reflection?: string;
 }
 
-export interface StoreData {
-  version: 1;
-  patientName: string;
-  /** Registros por fecha. */
-  days: Record<string, DayLog>;
-  /** Notas del terapeuta por semana (clave: lunes "YYYY-MM-DD"). */
-  therapistNotes: Record<string, string>;
-  settings: {
-    theme: 'system' | 'light' | 'dark';
-    accessCode: string;
-  };
-}
-
-/** Datos de paciente que se ven en la vista de terapeuta (propios, de un link o de un archivo). */
-export interface PatientDataset {
-  patientName: string;
-  days: Record<string, DayLog>;
-}
-
 /** Lo que devuelve el organizador (IA o modo básico). */
 export interface OrganizedDay {
   reply: string;

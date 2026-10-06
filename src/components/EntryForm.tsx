@@ -3,7 +3,7 @@ import { ArrowRight, Check } from 'lucide-react';
 import type { CategoryId, Entry, Rating } from '../types';
 import { CATEGORIES, categoryColorVar } from '../lib/categories';
 import { addMinutes, formatDuration, nowRounded, timeToMinutes } from '../lib/date';
-import { actions } from '../lib/store';
+import { actions } from '../lib/cloud';
 import { RatingScale } from './common';
 import { TimeSelect, type TimeShortcut } from './TimeSelect';
 

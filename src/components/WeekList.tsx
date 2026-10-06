@@ -1,47 +1,48 @@
 import { CalendarDays } from 'lucide-react';
-import type { DayLog } from '../types';
 import { isoWeekNumber, weekRangeLabel } from '../lib/date';
-import { countWeekEntries } from '../lib/stats';
+import type { WeekSummary } from '../lib/cloud';
+
+/** Semanas con registros, más la actual y la que se está viendo. */
+export function mergeWeeks(list: WeekSummary[], ...extra: WeekSummary[]): WeekSummary[] {
+  const map = new Map(list.map((w) => [w.week, w.entries]));
+  for (const w of extra) map.set(w.week, Math.max(w.entries, map.get(w.week) ?? 0));
+  return [...map].map(([week, entries]) => ({ week, entries })).sort((a, b) => b.week.localeCompare(a.week));
+}
 
 export function WeekList({
   weeks,
   current,
   thisWeek,
-  days,
   onSelect,
 }: {
-  weeks: string[];
+  weeks: WeekSummary[];
   current: string;
   thisWeek: string;
-  days: Record<string, DayLog>;
   onSelect: (monday: string) => void;
 }) {
   return (
     <ul className="nav-list">
-      {weeks.map((monday) => {
-        const count = countWeekEntries(days, monday);
-        return (
-          <li key={monday}>
-            <button
-              type="button"
-              className="nav-item"
-              aria-current={monday === current ? 'true' : undefined}
-              onClick={() => onSelect(monday)}
-            >
-              <CalendarDays aria-hidden />
-              <span className="nav-text">
-                {monday === thisWeek ? 'Esta semana' : `Semana ${isoWeekNumber(monday)}`}
-                <small>{weekRangeLabel(monday)}</small>
+      {weeks.map(({ week: monday, entries: count }) => (
+        <li key={monday}>
+          <button
+            type="button"
+            className="nav-item"
+            aria-current={monday === current ? 'true' : undefined}
+            onClick={() => onSelect(monday)}
+          >
+            <CalendarDays aria-hidden />
+            <span className="nav-text">
+              {monday === thisWeek ? 'Esta semana' : `Semana ${isoWeekNumber(monday)}`}
+              <small>{weekRangeLabel(monday)}</small>
+            </span>
+            {count > 0 && (
+              <span className="nav-badge" title={`${count} actividades`}>
+                {count > 99 ? '99+' : count}
               </span>
-              {count > 0 && (
-                <span className="nav-badge" title={`${count} actividades`}>
-                  {count > 99 ? '99+' : count}
-                </span>
-              )}
-            </button>
-          </li>
-        );
-      })}
+            )}
+          </button>
+        </li>
+      ))}
     </ul>
   );
 }

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, FileUp, NotebookPen, Printer } from 'lucide-react';
-import type { CategoryId, PatientDataset } from '../types';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, NotebookPen, Printer } from 'lucide-react';
+import type { CategoryId, DayLog } from '../types';
 import { CATEGORIES, MOODS, SCALES, getCategory, moodInfo, type ScaleKey } from '../lib/categories';
 import {
   formatDuration,
@@ -14,54 +14,61 @@ import { weekStats, withDurations, type RatedEntry } from '../lib/stats';
 import { CategoryAvatar, CategoryPill, Menu, MoodIcon, Scores } from './common';
 import { CategoryBars, DaySegments, RatingsChart } from './Charts';
 
-export type DataSource = 'local' | 'link' | 'file';
-
 function fmt(n: number): string {
   return n.toLocaleString('es-AR', { maximumFractionDigits: 1 });
 }
 
+export interface SessionNoteState {
+  loaded: boolean;
+  text: string;
+  save: (text: string) => void;
+}
+
+/**
+ * Informe semanal. Lo ve el terapeuta (con notas de sesión privadas) y el
+ * paciente (solo lectura, para saber qué ve su terapeuta).
+ */
 export function TherapistView({
-  dataset,
-  source,
+  days,
+  status,
+  patientName,
   week,
-  note,
-  onNote,
+  mode,
+  therapistName,
+  notes,
+  actions,
   onWeekStep,
-  onBackToLocal,
-  onOpenFile,
+  onRetry,
 }: {
-  dataset: PatientDataset;
-  source: DataSource;
+  days: Record<string, DayLog>;
+  status: 'loading' | 'ready' | 'error';
+  patientName: string;
   week: string;
-  note: string;
-  onNote: (note: string) => void;
+  mode: 'therapist' | 'patient';
+  /** Para el paciente: con quién comparte el registro. */
+  therapistName?: string | null;
+  notes?: SessionNoteState;
+  /** Acciones extra en el encabezado (por ejemplo, el menú del paciente). */
+  actions?: ReactNode;
   onWeekStep: (step: number) => void;
-  onBackToLocal: () => void;
-  onOpenFile: () => void;
+  onRetry: () => void;
 }) {
-  const stats = useMemo(() => weekStats(dataset.days, week), [dataset.days, week]);
+  const stats = useMemo(() => weekStats(days, week), [days, week]);
   const [filter, setFilter] = useState<CategoryId | 'todas'>('todas');
-  const name = dataset.patientName.trim();
+  const name = patientName.trim();
+  const firstName = name.split(/\s+/)[0];
   const avgMood = stats.avgMood ? MOODS[Math.round(stats.avgMood) - 1] : null;
   const constancy = Math.round((stats.daysWithEntries / 7) * 100);
   const usedCategories = new Set(stats.minutesByCategory.map((c) => c.id));
+  const loading = status === 'loading';
 
   return (
-    <div className="main-inner">
-      {source !== 'local' && (
-        <div className="source-banner">
-          <span>
-            Estás viendo {source === 'link' ? 'la semana compartida' : 'el registro importado'}
-            {name ? (
-              <>
-                {' '}
-                de <strong>{name}</strong>
-              </>
-            ) : null}
-            . No se guarda en este dispositivo.
-          </span>
-          <button type="button" className="btn btn-sm" onClick={onBackToLocal}>
-            Ver datos de este dispositivo
+    <div className={`main-inner${loading ? ' is-loading' : ''}`} aria-busy={loading}>
+      {status === 'error' && (
+        <div className="notice is-error" role="alert">
+          <span>No pudimos cargar esta semana. Revisá tu conexión.</span>
+          <button type="button" className="btn btn-sm" onClick={onRetry}>
+            Reintentar
           </button>
         </div>
       )}
@@ -69,7 +76,16 @@ export function TherapistView({
       <header className="page-head">
         <div>
           <p className="kicker">
-            Informe semanal{name ? <> · <b>{name}</b></> : null} · Semana <b>{isoWeekNumber(week)}</b>
+            {mode === 'therapist' ? (
+              <>
+                Informe semanal{name ? <> · <b>{name}</b></> : null}
+              </>
+            ) : (
+              <>
+                Tu informe{therapistName ? <> · Lo ve <b>{therapistName}</b></> : null}
+              </>
+            )}{' '}
+            · Semana <b>{isoWeekNumber(week)}</b>
           </p>
           <h1 className="display">
             {weekRangeLabel(week)} <span className="display-soft">{parseISODate(week).getFullYear()}</span>
@@ -84,13 +100,11 @@ export function TherapistView({
               <ChevronRight />
             </button>
           </div>
-          <button type="button" className="circle-btn only-compact" aria-label="Abrir archivo del paciente" onClick={onOpenFile}>
-            <FileUp />
-          </button>
           <button type="button" className="btn btn-primary" onClick={() => window.print()}>
             <Printer aria-hidden />
             Imprimir / PDF
           </button>
+          {actions}
         </div>
       </header>
 
@@ -148,7 +162,13 @@ export function TherapistView({
           ) : (
             <div className="hero-text">
               <p className="hero-title">Todavía no hay registros en esta semana</p>
-              <p className="hero-sub">Pedile a tu paciente el link para compartir o el archivo de respaldo.</p>
+              <p className="hero-sub">
+                {loading
+                  ? 'Cargando…'
+                  : mode === 'therapist'
+                    ? `Cuando ${firstName || 'tu paciente'} cargue actividades, las vas a ver acá.`
+                    : 'Cargá tus actividades en Mi registro y acá vas a ver el resumen de la semana.'}
+              </p>
             </div>
           )}
         </section>
@@ -163,7 +183,7 @@ export function TherapistView({
               {stats.daysWithEntries} de 7 días
             </span>
           </div>
-          <DaySegments dates={stats.dates} days={dataset.days} />
+          <DaySegments dates={stats.dates} days={days} />
           <div className="stat-foot no-print">
             <span className="lbl">Para la sesión:</span>
             <div className="row">
@@ -171,17 +191,19 @@ export function TherapistView({
                 Imprimir
                 <Printer aria-hidden />
               </button>
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={() => {
-                  document.getElementById('notas-sesion')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  document.getElementById('session-notes')?.focus({ preventScroll: true });
-                }}
-              >
-                Notas
-                <NotebookPen aria-hidden />
-              </button>
+              {notes && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    document.getElementById('notas-sesion')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    document.getElementById('session-notes')?.focus({ preventScroll: true });
+                  }}
+                >
+                  Notas
+                  <NotebookPen aria-hidden />
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -264,25 +286,32 @@ export function TherapistView({
           )}
         </header>
 
-        <WeekLog dataset={dataset} dates={stats.dates} filter={filter} />
+        <WeekLog days={days} dates={stats.dates} filter={filter} />
       </section>
 
-      <TherapistNotes key={`${dataset.patientName}|${week}`} value={note} onChange={onNote} />
+      {notes && (
+        <TherapistNotes
+          key={`${patientName}|${week}|${notes.loaded}`}
+          loaded={notes.loaded}
+          value={notes.text}
+          onChange={notes.save}
+        />
+      )}
     </div>
   );
 }
 
 function WeekLog({
-  dataset,
+  days,
   dates,
   filter,
 }: {
-  dataset: PatientDataset;
+  days: Record<string, DayLog>;
   dates: string[];
   filter: CategoryId | 'todas';
 }) {
   const withContent = dates.filter((date) => {
-    const d = dataset.days[date];
+    const d = days[date];
     return d && (d.entries.length || d.reflection || d.mood);
   });
   const empty = dates.filter((date) => !withContent.includes(date));
@@ -294,7 +323,7 @@ function WeekLog({
   return (
     <div className="log">
       {withContent.map((date) => {
-        const day = dataset.days[date]!;
+        const day = days[date]!;
         const entries = withDurations(day.entries).filter((e) => filter === 'todas' || e.category === filter);
         const mood = moodInfo(day.mood);
         return (
@@ -389,7 +418,15 @@ function TopList({ scale, items }: { scale: ScaleKey; items: RatedEntry[] }) {
   );
 }
 
-function TherapistNotes({ value, onChange }: { value: string; onChange: (note: string) => void }) {
+function TherapistNotes({
+  loaded,
+  value,
+  onChange,
+}: {
+  loaded: boolean;
+  value: string;
+  onChange: (note: string) => void;
+}) {
   const [text, setText] = useState(value);
 
   useEffect(() => {
@@ -408,14 +445,16 @@ function TherapistNotes({ value, onChange }: { value: string; onChange: (note: s
           id="session-notes"
           className="note-input"
           rows={4}
-          placeholder="Temas para trabajar, patrones que notaste, preguntas para la próxima sesión…"
+          maxLength={10000}
+          disabled={!loaded}
+          placeholder={loaded ? 'Temas para trabajar, patrones que notaste, preguntas para la próxima sesión…' : 'Cargando notas…'}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onBlur={() => text !== value && onChange(text)}
         />
       </div>
       <div className="tray-foot">
-        <span className="lbl">Solo para vos: se guardan en este dispositivo y no se comparten.</span>
+        <span className="lbl">Solo para vos: tu paciente no las ve. Se guardan solas mientras escribís.</span>
       </div>
     </section>
   );

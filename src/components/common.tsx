@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import {
   Annoyed,
   Briefcase,
@@ -204,6 +204,8 @@ export function Scores({ pleasure, control, compact }: { pleasure?: number | nul
 }
 
 export interface MenuItem {
+  /** Clave única si puede haber títulos repetidos. */
+  id?: string;
   label: string;
   hint?: string;
   selected?: boolean;
@@ -297,7 +299,7 @@ export function Menu({
         >
           {items.map((item) => (
             <button
-              key={item.label}
+              key={item.id ?? item.label}
               type="button"
               role={selectable ? 'menuitemradio' : 'menuitem'}
               aria-checked={selectable ? Boolean(item.selected) : undefined}
@@ -333,6 +335,7 @@ export function Modal({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
@@ -345,13 +348,14 @@ export function Modal({
     <dialog
       ref={ref}
       className="modal"
+      aria-labelledby={titleId}
       onClose={onClose}
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}
     >
       <div className="modal-head">
-        <h2>{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         <button type="button" className="circle-btn sm" onClick={onClose} aria-label="Cerrar">
           <X />
         </button>
@@ -402,4 +406,43 @@ export function downloadJson(filename: string, data: unknown) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export function Brand() {
+  return (
+    <div className="brand">
+      <span className="brand-mark" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+          <path d="M5 16.5h14M8 12.5a4 4 0 0 1 8 0" />
+        </svg>
+      </span>
+      <span>daily</span>
+    </div>
+  );
+}
+
+/** Iniciales de un nombre en un círculo (lista de pacientes). */
+export function Initials({ name }: { name: string }) {
+  const letters =
+    name
+      .trim()
+      .split(/\s+/)
+      .filter((w) => !/^(lic|dr|dra|psic|ps)\.?$/i.test(w))
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? '')
+      .join('') || '?';
+  return (
+    <span className="initials" aria-hidden>
+      {letters}
+    </span>
+  );
+}
+
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
 }

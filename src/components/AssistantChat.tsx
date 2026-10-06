@@ -4,7 +4,8 @@ import type { DayLog } from '../types';
 import { getCategory, moodInfo } from '../lib/categories';
 import { longDate, parseISODate, weekdayLong, weekdayShort } from '../lib/date';
 import { organizeDay, type ChatTurn, type OrganizeResult } from '../lib/organize';
-import { actions, newId } from '../lib/store';
+import { actions } from '../lib/cloud';
+import { newId } from '../lib/store';
 import { CategoryAvatar, Menu, MoodIcon, RoundCheck } from './common';
 
 export type ChatMessage =
@@ -76,7 +77,6 @@ export function AssistantChat({
   day,
   messages,
   onMessages,
-  accessCode,
   onClose,
   onAdded,
 }: {
@@ -84,7 +84,6 @@ export function AssistantChat({
   day: DayLog | undefined;
   messages: ChatMessage[];
   onMessages: (update: (prev: ChatMessage[]) => ChatMessage[]) => void;
-  accessCode: string;
   onClose?: () => void;
   onAdded: (count: number) => void;
 }) {
@@ -118,16 +117,13 @@ export function AssistantChat({
     setText('');
     setLoading(true);
     try {
-      const result = await organizeDay(
-        {
-          date,
-          dateLabel: longDate(date),
-          history,
-          message: trimmed,
-          existing: (day?.entries ?? []).map((e) => ({ start: e.start, end: e.end, activity: e.activity })),
-        },
-        accessCode,
-      );
+      const result = await organizeDay({
+        date,
+        dateLabel: longDate(date),
+        history,
+        message: trimmed,
+        existing: (day?.entries ?? []).map((e) => ({ start: e.start, end: e.end, activity: e.activity })),
+      });
       onMessages((prev) => [
         // Una propuesta nueva reemplaza a las anteriores que no se guardaron.
         ...prev.map((m) => (m.role === 'assistant' && m.status === 'pending' ? { ...m, status: 'replaced' as const } : m)),

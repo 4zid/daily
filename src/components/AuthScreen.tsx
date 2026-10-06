@@ -1,0 +1,506 @@
+import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  ArrowRight,
+  ChartColumn,
+  Eye,
+  EyeOff,
+  Link2,
+  LockKeyhole,
+  MailCheck,
+  NotebookPen,
+  Sparkles,
+  Stethoscope,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react';
+import { useAuth } from '../lib/auth';
+import { lookupInvitation } from '../lib/cloud';
+import { navigate } from '../lib/route';
+import { authErrorMessage } from '../lib/supabase';
+import { Brand, Initials } from './common';
+
+type Mode = 'login' | 'signup' | 'forgot' | 'sent' | 'confirm';
+type Role = 'therapist' | 'patient';
+
+interface InviteInfo {
+  status: 'idle' | 'loading' | 'valid' | 'invalid' | 'error';
+  therapistName?: string;
+}
+
+const MIN_PASSWORD = 8;
+
+const POINTS: Record<Role, [LucideIcon, string][]> = {
+  patient: [
+    [NotebookPen, 'Registrá tus actividades con placer y control, del 1 al 10.'],
+    [Sparkles, 'Contale tu día a la IA y lo ordena por vos.'],
+    [LockKeyhole, 'Solo vos y tu terapeuta pueden ver tus registros.'],
+  ],
+  therapist: [
+    [Link2, 'Invitá a tus pacientes con un link: su cuenta queda vinculada a la tuya.'],
+    [ChartColumn, 'Mirá cada semana: actividades, placer, control y ánimo.'],
+    [LockKeyhole, 'Tus notas de sesión son privadas: el paciente no las ve.'],
+  ],
+};
+
+/** Acepta el código solo o el link entero pegado en el campo. */
+function cleanCode(value: string): string {
+  const fromLink = /invitacion\/([A-Za-z0-9]+)/.exec(value)?.[1];
+  return (fromLink ?? value).replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 32);
+}
+
+export function AuthScreen({ inviteCode, recovery }: { inviteCode: string | null; recovery: boolean }) {
+  const auth = useAuth();
+  const ids = useId();
+  const [mode, setMode] = useState<Mode>(inviteCode ? 'signup' : 'login');
+  const [role, setRole] = useState<Role>(inviteCode ? 'patient' : 'therapist');
+  const [code, setCode] = useState(inviteCode ?? '');
+  const [fromLink, setFromLink] = useState(Boolean(inviteCode));
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [invite, setInvite] = useState<InviteInfo>({ status: 'idle' });
+
+  // Si se abre otro link de invitación con la pantalla abierta.
+  useEffect(() => {
+    if (!inviteCode) return;
+    setCode(inviteCode);
+    setFromLink(true);
+    setRole('patient');
+    setMode('signup');
+  }, [inviteCode]);
+
+  // Muestra de quién es la invitación antes de crear la cuenta.
+  useEffect(() => {
+    if (role !== 'patient' || code.length < 8) {
+      setInvite({ status: 'idle' });
+      return;
+    }
+    let active = true;
+    setInvite({ status: 'loading' });
+    const t = window.setTimeout(() => {
+      lookupInvitation(code)
+        .then((info) => {
+          if (!active) return;
+          setInvite(
+            info?.valid ? { status: 'valid', therapistName: info.therapistName } : { status: 'invalid' },
+          );
+        })
+        .catch(() => active && setInvite({ status: 'error' }));
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(t);
+    };
+  }, [code, role]);
+
+  function go(next: Mode) {
+    setMode(next);
+    setError('');
+    setShowPassword(false);
+  }
+
+  async function run(task: () => Promise<void>) {
+    setBusy(true);
+    setError('');
+    try {
+      await task();
+    } catch (e) {
+      setError(authErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    if (recovery) {
+      void run(() => auth.updatePassword(password));
+      return;
+    }
+    if (mode === 'login') {
+      void run(() => auth.signIn(email, password));
+    } else if (mode === 'forgot') {
+      void run(async () => {
+        await auth.requestPasswordReset(email);
+        go('sent');
+      });
+    } else if (mode === 'signup' && role === 'therapist') {
+      void run(async () => {
+        const { needsConfirmation } = await auth.signUpTherapist({ name, email, password });
+        if (needsConfirmation) go('confirm');
+      });
+    } else if (mode === 'signup') {
+      if (!consent) {
+        setError('Para crear la cuenta tenés que aceptar que tu terapeuta vea tus registros.');
+        return;
+      }
+      void run(async () => {
+        const { needsConfirmation } = await auth.signUpPatient({ name, email, password, code });
+        // La invitación ya se usó: la URL deja de apuntar a ella.
+        navigate('registro', true);
+        if (needsConfirmation) go('confirm');
+      });
+    }
+  }
+
+  const accentRole: Role = mode === 'signup' ? role : 'patient';
+  const therapistName = invite.status === 'valid' ? invite.therapistName?.trim() : '';
+  const heading =
+    therapistName && mode === 'signup' ? (
+      <>
+        <b>{therapistName}</b> te invitó a llevar tu registro diario.
+      </>
+    ) : accentRole === 'therapist' ? (
+      <>
+        El registro de tus pacientes, <b>semana a semana.</b>
+      </>
+    ) : (
+      <>
+        Tu día, ordenado. <b>Tu terapeuta, al tanto.</b>
+      </>
+    );
+
+  const passwordField = (label: string, autoComplete: string, hint?: string) => (
+    <div className="field">
+      <label htmlFor={`${ids}-password`}>{label}</label>
+      <div className="password-field">
+        <input
+          id={`${ids}-password`}
+          className="input"
+          type={showPassword ? 'text' : 'password'}
+          autoComplete={autoComplete}
+          required
+          minLength={autoComplete === 'new-password' ? MIN_PASSWORD : undefined}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          aria-describedby={hint ? `${ids}-password-hint` : undefined}
+        />
+        <button
+          type="button"
+          className="circle-btn ghost sm"
+          aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+          aria-pressed={showPassword}
+          onClick={() => setShowPassword((v) => !v)}
+        >
+          {showPassword ? <EyeOff /> : <Eye />}
+        </button>
+      </div>
+      {hint && (
+        <small id={`${ids}-password-hint`} className="form-hint">
+          {hint}
+        </small>
+      )}
+    </div>
+  );
+
+  const emailField = (
+    <div className="field">
+      <label htmlFor={`${ids}-email`}>Email</label>
+      <input
+        id={`${ids}-email`}
+        className="input"
+        type="email"
+        autoComplete="email"
+        inputMode="email"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+    </div>
+  );
+
+  let title: string;
+  let sub: ReactNode;
+  let body: ReactNode;
+  let foot: ReactNode;
+
+  if (recovery) {
+    title = 'Elegí una contraseña nueva';
+    sub = 'Con esta vas a ingresar de ahora en más.';
+    body = (
+      <>
+        {passwordField('Contraseña nueva', 'new-password', `Al menos ${MIN_PASSWORD} caracteres.`)}
+        <SubmitButton busy={busy}>Guardar contraseña</SubmitButton>
+      </>
+    );
+    foot = (
+      <button type="button" className="link-btn" onClick={() => void auth.signOut()}>
+        Cancelar
+      </button>
+    );
+  } else if (mode === 'sent' || mode === 'confirm') {
+    title = mode === 'sent' ? 'Revisá tu email' : 'Confirmá tu email';
+    sub = null;
+    body = (
+      <div className="auth-message">
+        <span className="empty-icon">
+          <MailCheck aria-hidden />
+        </span>
+        <p>
+          {mode === 'sent' ? (
+            <>
+              Si hay una cuenta con <b>{email}</b>, te llega un link para elegir una contraseña nueva.
+            </>
+          ) : (
+            <>
+              Te mandamos un link a <b>{email}</b>. Abrilo para activar tu cuenta.
+            </>
+          )}{' '}
+          Si no aparece en unos minutos, revisá el correo no deseado.
+        </p>
+        <button type="button" className="btn btn-primary" onClick={() => go('login')}>
+          Ir a ingresar
+        </button>
+      </div>
+    );
+    foot = null;
+  } else if (mode === 'forgot') {
+    title = 'Recuperá tu contraseña';
+    sub = 'Te mandamos un link para elegir una nueva.';
+    body = (
+      <>
+        {emailField}
+        <SubmitButton busy={busy}>Enviar link</SubmitButton>
+      </>
+    );
+    foot = (
+      <>
+        <span>¿Te acordaste?</span>
+        <button type="button" className="link-btn" onClick={() => go('login')}>
+          Ingresá
+        </button>
+      </>
+    );
+  } else if (mode === 'login') {
+    title = 'Ingresá';
+    sub = inviteCode
+      ? 'Después de ingresar vas a poder aceptar la invitación.'
+      : 'Con el email y la contraseña de tu cuenta.';
+    body = (
+      <>
+        {emailField}
+        {passwordField('Contraseña', 'current-password')}
+        <button type="button" className="link-btn forgot" onClick={() => go('forgot')}>
+          ¿Olvidaste tu contraseña?
+        </button>
+        <SubmitButton busy={busy}>Ingresar</SubmitButton>
+      </>
+    );
+    foot = (
+      <>
+        <span>¿No tenés cuenta?</span>
+        <button type="button" className="link-btn" onClick={() => go('signup')}>
+          Creá una
+        </button>
+      </>
+    );
+  } else {
+    title = 'Creá tu cuenta';
+    sub = role === 'therapist' ? 'Gratis. Después invitás a tus pacientes.' : 'Tu cuenta queda vinculada a tu terapeuta.';
+    body = (
+      <>
+        {!fromLink && (
+          <div className="role-pick" role="radiogroup" aria-label="Tipo de cuenta">
+            {(
+              [
+                ['therapist', Stethoscope, 'Soy terapeuta', 'Invito a mis pacientes'],
+                ['patient', UserRound, 'Soy paciente', 'Tengo una invitación'],
+              ] as const
+            ).map(([value, Icon, label, hint]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={role === value}
+                className="role-option"
+                onClick={() => {
+                  setRole(value);
+                  setError('');
+                }}
+              >
+                <Icon aria-hidden />
+                <span>
+                  <b>{label}</b>
+                  <small>{hint}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {role === 'patient' && (
+          <InviteBlock
+            code={code}
+            fromLink={fromLink}
+            invite={invite}
+            inputId={`${ids}-code`}
+            onCode={(value) => {
+              setCode(cleanCode(value));
+              setFromLink(false);
+            }}
+          />
+        )}
+
+        <div className="field">
+          <label htmlFor={`${ids}-name`}>{role === 'therapist' ? 'Tu nombre profesional' : 'Tu nombre'}</label>
+          <input
+            id={`${ids}-name`}
+            className="input"
+            type="text"
+            autoComplete="name"
+            required
+            maxLength={120}
+            placeholder={role === 'therapist' ? 'Lic. Ana Pérez' : 'Nombre y apellido'}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+        {emailField}
+        {passwordField('Contraseña', 'new-password', `Al menos ${MIN_PASSWORD} caracteres.`)}
+
+        {role === 'patient' && (
+          <label className="check-field">
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <span>
+              Entiendo que <b>{therapistName || 'mi terapeuta'}</b> va a poder ver las actividades, puntajes y reflexiones
+              que registre.
+            </span>
+          </label>
+        )}
+
+        <SubmitButton busy={busy} disabled={role === 'patient' && (invite.status === 'invalid' || !code)}>
+          Crear cuenta
+        </SubmitButton>
+      </>
+    );
+    foot = (
+      <>
+        <span>¿Ya tenés cuenta?</span>
+        <button type="button" className="link-btn" onClick={() => go('login')}>
+          Ingresá
+        </button>
+      </>
+    );
+  }
+
+  return (
+    <div className="auth" data-role={accentRole === 'therapist' ? 'therapist' : 'patient'}>
+      <aside className="auth-aside">
+        <svg className="auth-art" viewBox="0 0 400 600" aria-hidden preserveAspectRatio="xMidYMax slice">
+          <circle cx="360" cy="560" r="240" />
+          <circle cx="360" cy="560" r="160" />
+          <circle cx="60" cy="40" r="120" />
+          <circle className="fill" cx="300" cy="120" r="3" />
+          <circle className="fill" cx="340" cy="250" r="3" />
+        </svg>
+        <Brand />
+        <div className="auth-pitch">
+          <p className="auth-title">{heading}</p>
+          <ul className="auth-points">
+            {POINTS[accentRole].map(([Icon, text]) => (
+              <li key={text}>
+                <span className="auth-point-icon">
+                  <Icon aria-hidden />
+                </span>
+                {text}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className="auth-aside-foot">Acompaña la terapia, no la reemplaza.</p>
+      </aside>
+
+      <main className="auth-main">
+        <div className="auth-mobile-brand">
+          <Brand />
+        </div>
+        <div className="tray auth-tray">
+          <form className="tray-card auth-form" onSubmit={submit} noValidate={false}>
+            <header className="auth-head">
+              <h1>{title}</h1>
+              {sub && <p className="sub">{sub}</p>}
+            </header>
+            {body}
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            )}
+          </form>
+          {foot && <div className="tray-foot auth-foot">{foot}</div>}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function SubmitButton({ busy, disabled, children }: { busy: boolean; disabled?: boolean; children: ReactNode }) {
+  return (
+    <button type="submit" className="btn btn-primary btn-block" disabled={busy || disabled} aria-busy={busy}>
+      {busy ? 'Un momento…' : children}
+      {!busy && <ArrowRight aria-hidden />}
+    </button>
+  );
+}
+
+function InviteBlock({
+  code,
+  fromLink,
+  invite,
+  inputId,
+  onCode,
+}: {
+  code: string;
+  fromLink: boolean;
+  invite: InviteInfo;
+  inputId: string;
+  onCode: (value: string) => void;
+}) {
+  const showInput = !fromLink || invite.status === 'invalid';
+  return (
+    <div className="invite-block">
+      {showInput && (
+        <div className="field">
+          <label htmlFor={inputId}>Código de invitación</label>
+          <input
+            id={inputId}
+            className="input code-input"
+            type="text"
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            required
+            placeholder="Te lo da tu terapeuta"
+            value={code}
+            onChange={(e) => onCode(e.target.value)}
+          />
+        </div>
+      )}
+      {invite.status === 'loading' && <p className="form-hint">Buscando la invitación…</p>}
+      {invite.status === 'valid' && (
+        <div className="invite-card">
+          <Initials name={invite.therapistName || 'T'} />
+          <span>
+            <small>Te invitó</small>
+            <b>{invite.therapistName || 'Tu terapeuta'}</b>
+          </span>
+          <span className="soft-pill">Vigente</span>
+        </div>
+      )}
+      {invite.status === 'invalid' && (
+        <p className="form-error">
+          Esta invitación no es válida, venció o ya se usó. Pedile a tu terapeuta un link nuevo.
+        </p>
+      )}
+      {invite.status === 'error' && <p className="form-hint">No pude verificar la invitación. Igual podés crear la cuenta.</p>}
+      {invite.status === 'idle' && !fromLink && (
+        <p className="form-hint">Si tu terapeuta te mandó un link, abrilo y el código se completa solo.</p>
+      )}
+    </div>
+  );
+}
