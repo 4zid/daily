@@ -66,7 +66,11 @@ export default function App() {
         setSource('link');
         setWeek(shared.week);
       })
-      .catch(() => !cancelled && notify('El link compartido no es válido o está incompleto.'));
+      .catch((error) => {
+        if (cancelled) return;
+        const unsupported = error instanceof Error && error.message.startsWith('Este navegador');
+        notify(unsupported ? error.message : 'El link compartido no es válido o está incompleto.');
+      });
     return () => {
       cancelled = true;
     };
@@ -112,8 +116,12 @@ export default function App() {
 
   async function openShare() {
     setShare({ open: true, url: null });
-    const url = await buildShareUrl(data.patientName, week, data.days);
-    setShare({ open: true, url });
+    try {
+      setShare({ open: true, url: await buildShareUrl(data.patientName, week, data.days) });
+    } catch {
+      setShare({ open: false, url: null });
+      notify('No pude generar el link. Probá descargando el archivo desde Ajustes.');
+    }
   }
 
   async function openPatientFile(file: File) {

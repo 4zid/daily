@@ -19,6 +19,10 @@ export type ChatMessage =
     }
   | { id: string; role: 'error'; text: string };
 
+// Mismos límites que valida el servidor (api/organize.ts).
+const MAX_HISTORY_TURNS = 30;
+const MAX_MESSAGE_LENGTH = 8000;
+
 const EXAMPLES = [
   'Me levanté a las 8 y desayuné. De 9 a 13 trabajé, me costó concentrarme.',
   'A la tarde fui al gimnasio y a la noche cené con amigos, me sentí bien.',
@@ -33,7 +37,7 @@ function toHistory(messages: ChatMessage[]): ChatTurn[] {
       turns.push({ role: 'assistant', content: JSON.stringify({ reply, entries, dayMood, reflection, supportNote }) });
     }
   }
-  return turns;
+  return turns.slice(-MAX_HISTORY_TURNS);
 }
 
 // Dictado por voz del navegador (Chrome, Edge, Safari). Si no existe, el botón no aparece.
@@ -165,7 +169,7 @@ export function AssistantChat({
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
       }
-      setText(base + finalText.trim());
+      setText((base + finalText.trim()).slice(0, MAX_MESSAGE_LENGTH));
     };
     rec.onend = () => setListening(false);
     rec.onerror = () => setListening(false);
@@ -253,7 +257,7 @@ export function AssistantChat({
             ref={inputRef}
             rows={1}
             value={text}
-            maxLength={8000}
+            maxLength={MAX_MESSAGE_LENGTH}
             placeholder={listening ? 'Te escucho…' : `¿Cómo fue tu ${dayName}?`}
             aria-label="Contale tu día a la IA"
             onChange={(e) => setText(e.target.value)}

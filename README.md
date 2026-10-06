@@ -32,10 +32,12 @@ y reiniciá `npm run dev`. La clave queda del lado del servidor: nunca llega al 
 ## Publicarlo (Vercel)
 
 1. Importá este repositorio en Vercel (detecta Vite solo).
-2. En **Settings → Environment Variables** agregá `ANTHROPIC_API_KEY` y, recomendado, `APP_ACCESS_CODE`.
-3. Deploy. La carpeta `api/` se publica como función serverless (`/api/organize`).
+2. En **Settings → Environment Variables** agregá `ANTHROPIC_API_KEY` y `APP_ACCESS_CODE`.
+3. Deploy (o **Redeploy** si agregaste las variables después: Vercel las toma al construir). La carpeta `api/` se publica como función serverless (`/api/organize`).
 
-`APP_ACCESS_CODE` evita que cualquiera que encuentre la URL use tu clave: si está definido, la IA solo responde a quien cargue ese código en **Ajustes → Código de acceso a la IA**.
+`APP_ACCESS_CODE` evita que cualquiera que encuentre la URL use tu clave: la IA solo responde a quien cargue ese código en **Ajustes → Código de acceso a la IA**. En Vercel es obligatorio: sin él, el chat usa el modo básico.
+
+Compartí siempre el dominio de producción del proyecto (el `.vercel.app` corto que figura en **Domains**). Las URLs de cada despliegue y de rama quedan detrás del login de Vercel, y los registros se guardan por dominio: si cambiás de URL, no vas a ver los datos cargados en la otra.
 
 ## Dónde quedan los datos
 

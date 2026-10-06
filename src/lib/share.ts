@@ -36,14 +36,19 @@ export async function encodeWeek(patientName: string, monday: string, days: Reco
   }
   const payload: SharePayload = { v: 1, name: patientName, week: monday, days: weekOnly };
   const json = new TextEncoder().encode(JSON.stringify(payload));
-  if (typeof CompressionStream !== 'undefined') {
+  try {
     return `z${toBase64Url(await pipe(json, new CompressionStream('deflate-raw')))}`;
+  } catch {
+    // Navegador sin CompressionStream('deflate-raw'): el link va sin comprimir.
+    return `j${toBase64Url(json)}`;
   }
-  return `j${toBase64Url(json)}`;
 }
 
 export async function decodeWeek(token: string): Promise<PatientDataset & { week: string }> {
   const kind = token[0];
+  if (kind === 'z' && typeof DecompressionStream === 'undefined') {
+    throw new Error('Este navegador no puede abrir el link. Abrilo en un navegador actualizado.');
+  }
   const bytes = fromBase64Url(token.slice(1));
   const raw = kind === 'z' ? await pipe(bytes, new DecompressionStream('deflate-raw')) : bytes;
   const payload = JSON.parse(new TextDecoder().decode(raw)) as SharePayload;

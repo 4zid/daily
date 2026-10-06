@@ -56,13 +56,16 @@ const OrganizedDaySchema = z.object({
   supportNote: z.string().nullable(),
 });
 
+// Turnos de conversación previos que se mandan a la IA (los más recientes).
+const MAX_HISTORY_TURNS = 30;
+
 const RequestSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dateLabel: z.string().max(80),
   message: z.string().trim().min(1).max(8000),
   history: z
     .array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(16000) }))
-    .max(30),
+    .max(200),
   existing: z
     .array(z.object({ start: z.string().max(5), end: z.string().max(5).optional(), activity: z.string().max(300) }))
     .max(200),
@@ -76,7 +79,7 @@ function json(body: unknown, status = 200): Response {
 
 function buildMessages(req: OrganizeRequest): Anthropic.Beta.BetaMessageParam[] {
   const messages: Anthropic.Beta.BetaMessageParam[] = [];
-  for (const turn of req.history) {
+  for (const turn of req.history.slice(-MAX_HISTORY_TURNS)) {
     // La conversación tiene que empezar con un mensaje de la persona.
     if (messages.length === 0 && turn.role !== 'user') continue;
     messages.push({ role: turn.role, content: turn.content });
@@ -99,6 +102,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const accessCode = process.env.APP_ACCESS_CODE;
+  // Publicada en Vercel, la IA no responde sin código: así nadie más gasta tu clave.
+  if (!accessCode && process.env.VERCEL) {
+    return json({ error: 'not_configured', message: 'Falta configurar APP_ACCESS_CODE.' }, 503);
+  }
   if (accessCode && request.headers.get('x-access-code') !== accessCode) {
     return json({ error: 'unauthorized', message: 'Código de acceso incorrecto.' }, 401);
   }
@@ -145,6 +152,14 @@ export async function POST(request: Request): Promise<Response> {
     if (error instanceof Anthropic.APIError) {
       console.error('Anthropic API error', error.status, error.message);
       return json({ error: 'api', message: 'La IA devolvió un error. Probá de nuevo en un momento.' }, 502);
+    }
+    if (error instanceof Anthropic.AnthropicError) {
+      // parse() falla si la respuesta quedó cortada o se declinó a mitad de camino.
+      console.error('Anthropic: respuesta no válida', error.message);
+      return json(
+        { error: 'parse_error', message: 'No pude ordenar este relato. Probá de nuevo o cargalo a mano.' },
+        502,
+      );
     }
     throw error;
   }
