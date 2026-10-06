@@ -9,8 +9,11 @@ export type CategoryId =
   | 'tareas'
   | 'otro';
 
-/** 1 = muy mal … 5 = muy bien */
+/** 1 = muy mal … 5 = muy bien (ánimo general del día). */
 export type Mood = 1 | 2 | 3 | 4 | 5;
+
+/** Puntaje de 1 (nada) a 10 (muchísimo). */
+export type Rating = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export interface Entry {
   id: string;
@@ -20,7 +23,10 @@ export interface Entry {
   end?: string;
   activity: string;
   category: CategoryId;
-  mood?: Mood;
+  /** Cuánto lo disfrutó (1–10). */
+  pleasure?: Rating;
+  /** Cuánto control o dominio sintió (1–10). */
+  control?: Rating;
   notes?: string;
   source?: 'manual' | 'ia';
 }

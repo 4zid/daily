@@ -1,21 +1,30 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ArrowRight, Check } from 'lucide-react';
-import type { CategoryId, Entry, Mood } from '../types';
+import type { CategoryId, Entry, Rating } from '../types';
 import { CATEGORIES, categoryColorVar } from '../lib/categories';
 import { formatDuration, timeToMinutes } from '../lib/date';
 import { actions } from '../lib/store';
-import { MoodPicker } from './common';
+import { RatingScale } from './common';
 
 interface Draft {
   start: string;
   end: string;
   activity: string;
   category: CategoryId;
-  mood: Mood | undefined;
+  pleasure: Rating | undefined;
+  control: Rating | undefined;
   notes: string;
 }
 
-const EMPTY: Draft = { start: '', end: '', activity: '', category: 'otro', mood: undefined, notes: '' };
+const EMPTY: Draft = {
+  start: '',
+  end: '',
+  activity: '',
+  category: 'otro',
+  pleasure: undefined,
+  control: undefined,
+  notes: '',
+};
 
 function fromEntry(e: Entry): Draft {
   return {
@@ -23,7 +32,8 @@ function fromEntry(e: Entry): Draft {
     end: e.end ?? '',
     activity: e.activity,
     category: e.category,
-    mood: e.mood,
+    pleasure: e.pleasure,
+    control: e.control,
     notes: e.notes ?? '',
   };
 }
@@ -65,7 +75,8 @@ export function EntryForm({
       end: draft.end || undefined,
       activity: draft.activity.trim(),
       category: draft.category,
-      mood: draft.mood,
+      pleasure: draft.pleasure,
+      control: draft.control,
       notes: draft.notes.trim() || undefined,
     };
     if (editing) {
@@ -136,6 +147,11 @@ export function EntryForm({
           ))}
         </div>
 
+        <div className="ratings">
+          <RatingScale scale="pleasure" value={draft.pleasure} onChange={(v) => set('pleasure', v)} />
+          <RatingScale scale="control" value={draft.control} onChange={(v) => set('control', v)} />
+        </div>
+
         <input
           className="soft-input"
           type="text"
@@ -149,8 +165,7 @@ export function EntryForm({
 
       <div className="tray-foot">
         <div className="tray-foot-start">
-          <span className="lbl">¿Cómo te sentiste?</span>
-          <MoodPicker size="sm" label="Ánimo en esta actividad" value={draft.mood} onChange={(m) => set('mood', m)} />
+          <span className="lbl">Puntuá placer y control del 1 (nada) al 10 (muchísimo).</span>
         </div>
         <div className="tray-foot-end">
           {editing && (

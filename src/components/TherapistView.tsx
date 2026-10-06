@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, NotebookPen, Printer } from 'lucide-react';
 import type { CategoryId, PatientDataset } from '../types';
-import { CATEGORIES, MOODS, getCategory, moodInfo } from '../lib/categories';
+import { CATEGORIES, MOODS, SCALES, getCategory, moodInfo, type ScaleKey } from '../lib/categories';
 import {
   formatDuration,
-  formatHours,
   isoWeekNumber,
   longDate,
   parseISODate,
   weekRangeLabel,
   weekdayShort,
 } from '../lib/date';
-import { weekStats, withDurations } from '../lib/stats';
-import { CategoryAvatar, CategoryPill, Menu } from './common';
-import { CategoryBars, DaySegments, MoodColumns } from './Charts';
+import { weekStats, withDurations, type RatedEntry } from '../lib/stats';
+import { CategoryAvatar, CategoryPill, Menu, Scores } from './common';
+import { CategoryBars, DaySegments, RatingsChart } from './Charts';
 
 export type DataSource = 'local' | 'link' | 'file';
 
@@ -105,21 +104,35 @@ export function TherapistView({
               <ArrowUpRight />
             </a>
           </div>
-          {stats.totalEntries > 0 || avgMood ? (
+          {stats.avgPleasure || stats.avgControl ? (
             <div className="hero-text">
-              <p className="hero-title">
-                {avgMood ? (
-                  <>
-                    Ánimo promedio {fmt(stats.avgMood!)} · {avgMood.label}
-                  </>
-                ) : (
-                  'Semana sin registro de ánimo'
-                )}
+              <div className="hero-scores">
+                {(['pleasure', 'control'] as const).map((k) => {
+                  const v = k === 'pleasure' ? stats.avgPleasure : stats.avgControl;
+                  return (
+                    <div key={k} className="hero-score">
+                      <span>{SCALES[k].label}</span>
+                      <b>
+                        {v ? fmt(v) : '–'}
+                        <small>/10</small>
+                      </b>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="hero-sub">
+                Promedios de la semana · {stats.totalEntries} actividad{stats.totalEntries === 1 ? '' : 'es'} en{' '}
+                {stats.daysWithEntries} día{stats.daysWithEntries === 1 ? '' : 's'}
+                {avgMood ? ` · Ánimo general: ${avgMood.label.toLowerCase()}` : ''}
               </p>
+            </div>
+          ) : stats.totalEntries > 0 || avgMood ? (
+            <div className="hero-text">
+              <p className="hero-title">Todavía no hay puntajes de placer y control</p>
               <p className="hero-sub">
                 {stats.totalEntries} actividad{stats.totalEntries === 1 ? '' : 'es'} en {stats.daysWithEntries} día
                 {stats.daysWithEntries === 1 ? '' : 's'}
-                {stats.totalMinutes ? ` · ${formatHours(stats.totalMinutes)} registradas` : ''}
+                {avgMood ? ` · Ánimo general: ${avgMood.label.toLowerCase()}` : ''}
               </p>
             </div>
           ) : (
@@ -157,38 +170,49 @@ export function TherapistView({
         </section>
       </div>
 
-      {stats.totalEntries > 0 || stats.avgMood ? (
-        <div className="grid-2">
-          <section className="card chart-card" aria-labelledby="mood-title">
+      {stats.totalEntries > 0 ? (
+        <>
+          <section className="card chart-card" aria-labelledby="ratings-title">
             <header className="card-head">
               <div>
-                <h3 id="mood-title" className="h3">
-                  Ánimo por día
+                <h3 id="ratings-title" className="h3">
+                  Placer y control por día
                 </h3>
-                <p className="sub">De 1 (muy mal) a 5 (muy bien)</p>
+                <p className="sub">Promedio de las actividades, del 1 (nada) al 10 (muchísimo). Debajo, el ánimo del día.</p>
               </div>
-              <span className="soft-pill">Lun – Dom</span>
             </header>
-            <MoodColumns data={stats.moodByDay} average={stats.avgMood} />
-            <p className="chart-note">Las columnas con borde punteado salen del promedio de las actividades.</p>
+            <RatingsChart data={stats.ratingsByDay} moods={stats.moodByDay} />
           </section>
 
-          <section className="card chart-card" aria-labelledby="time-title">
-            <header className="card-head">
-              <div>
-                <h3 id="time-title" className="h3">
-                  Tiempo por categoría
-                </h3>
-                <p className="sub">Sin hora de fin, cada actividad cuenta hasta la siguiente (máx. 4 h)</p>
+          <div className="grid-2">
+            <section className="card chart-card" aria-labelledby="top-title">
+              <header className="card-head">
+                <div>
+                  <h3 id="top-title" className="h3">
+                    Actividades destacadas
+                  </h3>
+                  <p className="sub">Las de más placer y las de más control</p>
+                </div>
+              </header>
+              <div className="tops">
+                <TopList scale="pleasure" items={stats.topPleasure} />
+                <TopList scale="control" items={stats.topControl} />
               </div>
-            </header>
-            {stats.minutesByCategory.length ? (
+            </section>
+
+            <section className="card chart-card" aria-labelledby="time-title">
+              <header className="card-head">
+                <div>
+                  <h3 id="time-title" className="h3">
+                    Tiempo por categoría
+                  </h3>
+                  <p className="sub">Con placer y control promedio. Sin hora de fin, cuenta hasta la siguiente (máx. 4 h)</p>
+                </div>
+              </header>
               <CategoryBars data={stats.minutesByCategory} totalMinutes={stats.totalMinutes} />
-            ) : (
-              <p className="sub">Sin actividades.</p>
-            )}
-          </section>
-        </div>
+            </section>
+          </div>
+        </>
       ) : null}
 
       <section className="card list-card" id="registro-semana" aria-labelledby="log-title">
@@ -272,13 +296,20 @@ function WeekLog({
             {entries.length > 0 && (
               <ul className="items">
                 {entries.map((e) => {
-                  const em = moodInfo(e.mood);
                   return (
                     <li key={e.id} className="item is-static">
                       <CategoryAvatar id={e.category} />
                       <div className="item-main">
                         <p className="item-title">{e.activity}</p>
-                        {e.notes && <p className="item-sub item-notes">{e.notes}</p>}
+                        <p className="item-sub">
+                          <span className="item-cat-inline">{getCategory(e.category).label}</span>
+                          {e.notes && (
+                            <span className="item-notes">
+                              <span className="item-cat-inline"> · </span>
+                              {e.notes}
+                            </span>
+                          )}
+                        </p>
                       </div>
                       <span className="item-time tabular">
                         {e.start}
@@ -288,8 +319,8 @@ function WeekLog({
                       <span className="item-cat">
                         <CategoryPill id={e.category} />
                       </span>
-                      <span className="item-mood" title={em?.label}>
-                        {em ? <span aria-label={`Ánimo: ${em.label}`}>{em.emoji}</span> : <span className="muted">—</span>}
+                      <span className="item-scores">
+                        <Scores pleasure={e.pleasure} control={e.control} />
                       </span>
                     </li>
                   );
@@ -302,6 +333,36 @@ function WeekLog({
       })}
       {empty.length > 0 && (
         <p className="empty-line">Sin registros: {empty.map((d) => `${weekdayShort(d)} ${parseISODate(d).getDate()}`).join(', ')}</p>
+      )}
+    </div>
+  );
+}
+
+function TopList({ scale, items }: { scale: ScaleKey; items: RatedEntry[] }) {
+  const info = SCALES[scale];
+  return (
+    <div className="top-list" style={{ ['--tone' as string]: info.color }}>
+      <p className="top-title">
+        <span className="dot" aria-hidden />
+        Más {info.label.toLowerCase()}
+      </p>
+      {items.length ? (
+        <ol className="top-items">
+          {items.map(({ date, entry }) => (
+            <li key={entry.id} className="top-item">
+              <CategoryAvatar id={entry.category} />
+              <span className="top-main">
+                <span className="top-activity">{entry.activity}</span>
+                <small>
+                  {weekdayShort(date)} {parseISODate(date).getDate()} · {entry.start}
+                </small>
+              </span>
+              <b className="top-value tabular">{entry[scale]}</b>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="sub">Sin puntajes todavía.</p>
       )}
     </div>
   );

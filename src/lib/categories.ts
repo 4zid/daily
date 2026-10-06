@@ -1,4 +1,4 @@
-import type { CategoryId, Mood } from '../types';
+import type { CategoryId, Mood, Rating } from '../types';
 
 export interface Category {
   id: CategoryId;
@@ -51,3 +51,15 @@ export function moodInfo(mood: Mood | undefined | null) {
 export function isMood(value: unknown): value is Mood {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5;
 }
+
+export function isRating(value: unknown): value is Rating {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 10;
+}
+
+/** Placer y control: las dos sensaciones que se puntúan en cada actividad. */
+export const SCALES = {
+  pleasure: { label: 'Placer', question: '¿Cuánto lo disfrutaste?', color: 'var(--pleasure)' },
+  control: { label: 'Control', question: '¿Cuánto control o dominio sentiste?', color: 'var(--control)' },
+} as const;
+
+export type ScaleKey = keyof typeof SCALES;

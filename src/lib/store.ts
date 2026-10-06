@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { DayLog, Entry, Mood, StoreData } from '../types';
-import { isCategoryId, isMood } from './categories';
+import { isCategoryId, isMood, isRating } from './categories';
 import { normalizeTime, timeToMinutes } from './date';
 
 const STORAGE_KEY = 'daily.registro.v1';
@@ -40,7 +40,8 @@ export function sanitizeDay(raw: unknown, date: string): DayLog | null {
         end: normalizeTime(typeof e.end === 'string' ? e.end : undefined),
         activity,
         category: isCategoryId(e.category) ? e.category : 'otro',
-        mood: isMood(e.mood) ? e.mood : undefined,
+        pleasure: isRating(e.pleasure) ? e.pleasure : undefined,
+        control: isRating(e.control) ? e.control : undefined,
         notes: typeof e.notes === 'string' && e.notes.trim() ? e.notes.trim() : undefined,
         source: e.source === 'ia' ? 'ia' : 'manual',
       });

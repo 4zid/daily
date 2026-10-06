@@ -28,12 +28,12 @@ const EXAMPLES = [
   {
     label: 'Día con horarios',
     hint: 'Con horas de inicio y fin',
-    text: 'Me levanté a las 8 y desayuné. De 9 a 13 trabajé, me costó concentrarme. A las 18 fui al gimnasio.',
+    text: 'A las 8 desayuné, placer 6, control 7. De 9 a 13 trabajé, me costó concentrarme: placer 3, control 4. A las 18 fui al gimnasio, placer 8, control 8.',
   },
   {
     label: 'Día sin horarios',
     hint: 'La IA estima las horas',
-    text: 'A la mañana limpié la casa, a la tarde fui a terapia y a la noche cené con amigos. Me sentí bien.',
+    text: 'A la mañana limpié la casa, a la tarde fui a terapia y a la noche cené con amigos, lo disfruté muchísimo.',
   },
   {
     label: 'Día difícil',
@@ -359,9 +359,7 @@ function Proposal({
                     />
                     <CategoryAvatar id={e.category} />
                     <span className="what">
-                      <span className="what-title">
-                        {e.activity} {moodInfo(e.mood)?.emoji}
-                      </span>
+                      <span className="what-title">{e.activity}</span>
                       <small>
                         <span className="tabular">
                           {e.start}
@@ -369,6 +367,8 @@ function Proposal({
                         </span>
                         {' · '}
                         {getCategory(e.category).label}
+                        {e.pleasure ? ` · Placer ${e.pleasure}` : ''}
+                        {e.control ? ` · Control ${e.control}` : ''}
                         {e.notes ? ` · ${e.notes}` : ''}
                       </small>
                     </span>

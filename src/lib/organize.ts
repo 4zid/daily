@@ -1,5 +1,5 @@
 import type { Entry, OrganizedDay } from '../types';
-import { isCategoryId, isMood } from './categories';
+import { isCategoryId, isMood, isRating } from './categories';
 import { normalizeTime } from './date';
 import { organizeBasic } from './basicParser';
 
@@ -21,6 +21,12 @@ export type OrganizeResult = OrganizedDay & { mode: 'ia' | 'basico'; notice?: st
 
 class ApiUnavailable extends Error {}
 
+/** Redondea y valida un puntaje de 1 a 10 que llega de la IA. */
+function toRating(value: unknown) {
+  const n = typeof value === 'number' ? Math.round(value) : value;
+  return isRating(n) ? n : undefined;
+}
+
 function sanitize(raw: OrganizedDay): OrganizedDay {
   const entries = (Array.isArray(raw.entries) ? raw.entries : [])
     .map((e) => ({
@@ -28,7 +34,8 @@ function sanitize(raw: OrganizedDay): OrganizedDay {
       end: normalizeTime(e.end),
       activity: String(e.activity ?? '').trim(),
       category: isCategoryId(e.category) ? e.category : 'otro',
-      mood: isMood(e.mood) ? e.mood : undefined,
+      pleasure: toRating(e.pleasure),
+      control: toRating(e.control),
       notes: e.notes ? String(e.notes).trim() || undefined : undefined,
       source: 'ia' as const,
     }))

@@ -1,4 +1,4 @@
-import type { CategoryId, Entry, OrganizedDay } from '../types';
+import type { CategoryId, Entry, OrganizedDay, Rating } from '../types';
 import { pad, timeToMinutes } from './date';
 
 // Modo básico (sin IA): separa el relato en frases, busca horarios y adivina la
@@ -15,6 +15,18 @@ const KEYWORDS: [CategoryId, RegExp][] = [
   ['ocio', /\b(serie|pel[íi]cula|netflix|jugu[ée]|juego|play|redes|instagram|tiktok|youtube|celular|le[íi]|libro|m[úu]sica|tele)/],
   ['tareas', /\b(limpi|cocin|compras|super|lav[ée]|ordené|orden[ée]|tr[áa]mite|colectivo|subte|tren|manej|viaj)/],
 ];
+
+// "placer 7", "placer: 8/10", "control de 5"
+const SCORE_RE = {
+  pleasure: /\bplacer\s*(?:de|:)?\s*(\d{1,2})(?:\s*\/\s*10)?/i,
+  control: /\bcontrol\s*(?:de|:)?\s*(\d{1,2})(?:\s*\/\s*10)?/i,
+};
+
+function findScore(text: string, key: keyof typeof SCORE_RE): Rating | undefined {
+  const m = SCORE_RE[key].exec(text);
+  const n = m ? Number(m[1]) : NaN;
+  return n >= 1 && n <= 10 ? (n as Rating) : undefined;
+}
 
 function guessCategory(text: string): CategoryId {
   const t = text.toLowerCase();
@@ -65,6 +77,9 @@ function cleanActivity(text: string): string {
     .replace(SINGLE_RE, '')
     .replace(/^\s*(y|e|después|despues|luego|más tarde|mas tarde|entonces|también|tambien)\b[\s,]*/i, '')
     .replace(PART_OF_DAY_RE, '')
+    .replace(SCORE_RE.pleasure, '')
+    .replace(SCORE_RE.control, '')
+    .replace(/[,;]?\s*(?:y\s*)?$/i, '')
     .replace(/\s+([.,;:!?])/g, '$1')
     .replace(/\s{2,}/g, ' ')
     .replace(/^[\s,;:.-]+|[\s,;:.-]+$/g, '')
@@ -141,6 +156,8 @@ export function organizeBasic(text: string): OrganizedDay {
       end,
       activity: activity.length > 80 ? `${activity.slice(0, 77)}…` : activity,
       category: guessCategory(sentence),
+      pleasure: findScore(sentence, 'pleasure'),
+      control: findScore(sentence, 'control'),
       notes: approximate ? 'Hora aproximada' : undefined,
       source: 'ia',
     });
@@ -151,7 +168,11 @@ export function organizeBasic(text: string): OrganizedDay {
 
   return {
     reply: entries.length
-      ? `Encontré ${entries.length} actividad${entries.length === 1 ? '' : 'es'}. Revisalas antes de agregarlas: en modo básico puedo equivocarme con horarios y categorías.`
+      ? `Encontré ${entries.length} actividad${entries.length === 1 ? '' : 'es'}. Revisalas antes de agregarlas: en modo básico puedo equivocarme con horarios y categorías.${
+          entries.some((e) => !e.pleasure || !e.control)
+            ? ' Si querés, sumá placer y control a cada una (por ejemplo: «placer 7, control 5»).'
+            : ''
+        }`
       : 'No pude encontrar horarios en el relato. Probá mencionando las horas, por ejemplo: "a las 9 desayuné, de 10 a 13 trabajé".',
     entries,
     dayMood: null,

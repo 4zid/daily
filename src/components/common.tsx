@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import {
   Briefcase,
   Check,
@@ -13,8 +13,8 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import type { CategoryId, Mood } from '../types';
-import { MOODS, categoryColorVar, getCategory } from '../lib/categories';
+import type { CategoryId, Mood, Rating } from '../types';
+import { MOODS, SCALES, categoryColorVar, getCategory, type ScaleKey } from '../lib/categories';
 
 const CATEGORY_ICONS: Record<CategoryId, LucideIcon> = {
   trabajo: Briefcase,
@@ -96,6 +96,97 @@ export function MoodPicker({
         </button>
       ))}
     </div>
+  );
+}
+
+const STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const;
+
+function fmtScore(n: number): string {
+  return n.toLocaleString('es-AR', { maximumFractionDigits: 1 });
+}
+
+/**
+ * Escala del 1 al 10 como barra segmentada: los tramos hasta el valor elegido
+ * se llenan. Funciona como radiogroup (flechas para cambiar el valor).
+ */
+export function RatingScale({
+  scale,
+  value,
+  onChange,
+}: {
+  scale: ScaleKey;
+  value: Rating | undefined;
+  onChange: (value: Rating | undefined) => void;
+}) {
+  const info = SCALES[scale];
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  function onKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    const delta = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 0;
+    if (!delta) return;
+    e.preventDefault();
+    const next = Math.min(10, Math.max(1, (value ?? 0) + delta)) as Rating;
+    onChange(next);
+    refs.current[next - 1]?.focus();
+  }
+
+  return (
+    <div className="rating" style={{ ['--tone' as string]: info.color }}>
+      <div className="rating-head">
+        <span className="rating-label" id={`rating-${scale}`}>
+          <span className="dot" aria-hidden />
+          {info.label}
+          <span className="rating-question">{info.question}</span>
+        </span>
+        <span className="rating-value" aria-hidden>
+          {value ?? '–'}
+          <small>/10</small>
+        </span>
+      </div>
+      <div className="rating-scale" role="radiogroup" aria-labelledby={`rating-${scale}`} onKeyDown={onKeyDown}>
+        {STEPS.map((n) => (
+          <button
+            key={n}
+            ref={(el) => {
+              refs.current[n - 1] = el;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={value === n}
+            aria-label={`${n} de 10`}
+            tabIndex={value ? (value === n ? 0 : -1) : n === 1 ? 0 : -1}
+            className={`rating-step${value && n <= value ? ' is-filled' : ''}`}
+            onClick={() => onChange(value === n ? undefined : n)}
+          >
+            <span className="rating-bar" aria-hidden />
+            <span className="rating-num" aria-hidden>
+              {n}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Puntajes de placer y control de una actividad, para listas e informes. */
+export function Scores({ pleasure, control, compact }: { pleasure?: number | null; control?: number | null; compact?: boolean }) {
+  if (!pleasure && !control) {
+    return compact ? null : <span className="scores scores-empty">Sin puntaje</span>;
+  }
+  return (
+    <span className={`scores${compact ? ' is-compact' : ''}`}>
+      {(['pleasure', 'control'] as const).map((key) => {
+        const v = key === 'pleasure' ? pleasure : control;
+        return (
+          <span key={key} className="score" style={{ ['--tone' as string]: SCALES[key].color }}>
+            <span className="dot" aria-hidden />
+            <span className="score-label">{SCALES[key].label}</span>
+            <b className="tabular">{v ? fmtScore(v) : '–'}</b>
+          </span>
+        );
+      })}
+    </span>
   );
 }
 

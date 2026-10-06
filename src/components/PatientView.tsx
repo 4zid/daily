@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Ellipsis, NotebookPen, Send, Sparkles } from 'lucide-react';
 import type { DayLog, Entry } from '../types';
-import { moodInfo } from '../lib/categories';
+import { getCategory, moodInfo } from '../lib/categories';
 import {
   formatDuration,
   isoWeekNumber,
@@ -13,8 +13,8 @@ import {
   weekdayShort,
 } from '../lib/date';
 import { actions } from '../lib/store';
-import { withDurations } from '../lib/stats';
-import { CategoryAvatar, CategoryPill, Menu, MoodPicker } from './common';
+import { average, withDurations } from '../lib/stats';
+import { CategoryAvatar, Menu, MoodPicker, Scores } from './common';
 import { EntryForm } from './EntryForm';
 
 export function PatientView({
@@ -119,6 +119,8 @@ function DayPanel({
   const editing = day?.entries.find((e) => e.id === editingId) ?? null;
   const last = day?.entries[day.entries.length - 1];
   const totalMinutes = entries.reduce((sum, e) => sum + (e.minutes ?? 0), 0);
+  const dayPleasure = average(entries.map((e) => e.pleasure));
+  const dayControl = average(entries.map((e) => e.control));
 
   return (
     <section className="day-panel" aria-labelledby="day-title">
@@ -146,6 +148,12 @@ function DayPanel({
                 : `${entries.length} registrada${entries.length === 1 ? '' : 's'}${totalMinutes ? ` · ${formatDuration(totalMinutes)}` : ''}`}
             </p>
           </div>
+          {(dayPleasure || dayControl) && (
+            <div className="head-scores" aria-label="Promedios del día">
+              <span className="lbl">Promedio</span>
+              <Scores pleasure={dayPleasure} control={dayControl} />
+            </div>
+          )}
         </header>
 
         {entries.length === 0 ? (
@@ -158,7 +166,6 @@ function DayPanel({
         ) : (
           <ul className="items">
             {entries.map((e) => {
-              const mood = moodInfo(e.mood);
               return (
                 <li key={e.id} className={`item${e.id === editingId ? ' is-editing' : ''}`}>
                   <CategoryAvatar id={e.category} />
@@ -180,14 +187,12 @@ function DayPanel({
                       {!e.end && e.minutes ? (
                         <span title="Hasta la siguiente actividad"> · ≈ {formatDuration(e.minutes)}</span>
                       ) : null}
+                      <span> · {getCategory(e.category).label}</span>
                       {e.notes ? <span className="item-notes"> · {e.notes}</span> : null}
                     </p>
                   </div>
-                  <span className="item-cat">
-                    <CategoryPill id={e.category} />
-                  </span>
-                  <span className="item-mood" title={mood?.label}>
-                    {mood ? <span aria-label={`Ánimo: ${mood.label}`}>{mood.emoji}</span> : null}
+                  <span className="item-scores">
+                    <Scores pleasure={e.pleasure} control={e.control} />
                   </span>
                   <Menu
                     label={`Opciones de ${e.activity}`}
@@ -196,7 +201,7 @@ function DayPanel({
                     items={[
                       {
                         label: 'Editar',
-                        hint: 'Cambiar horario, categoría o notas',
+                        hint: 'Horario, categoría, placer, control o notas',
                         onSelect: () => {
                           setEditingId(e.id);
                           document.getElementById('day-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });

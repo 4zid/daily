@@ -26,11 +26,11 @@ Cómo ordenar:
 - "end" solo si dijo cuándo terminó o se deduce con claridad ("de 10 a 13"). Si no, null: la app asume que dura hasta la siguiente actividad.
 - "activity": frase breve (hasta 8 palabras) que diga qué hizo, por ejemplo "Desayuno con mi hermana" o "Trabajo en el proyecto".
 - "category", una de: trabajo (trabajo o estudio), comidas, movimiento (actividad física), ocio (ocio y pantallas), vinculos (vínculos y vida social), autocuidado (autocuidado y salud, incluye terapia y medicación), descanso (dormir, siesta, descansar), tareas (tareas del hogar, trámites, traslados), otro.
-- "mood" de 1 (muy mal) a 5 (muy bien) solo si la persona expresó cómo se sintió en esa actividad; si no, null.
+- "pleasure" (placer) y "control", de 1 (nada) a 10 (muchísimo). Son los dos puntajes que el terapeuta mira en cada actividad: placer es cuánto la disfrutó; control es cuánto dominio, logro o control sintió al hacerla. Completalos solo si la persona dio el número o lo dijo con claridad ("lo disfruté muchísimo", "sentí que no podía con nada"); si no, null para que lo complete ella. No los inventes.
 - "notes": emociones, pensamientos o detalles que puedan importarle a su terapeuta, lo más fiel posible a sus palabras. null si no hay nada.
 - "dayMood": cómo fue el día en general, de 1 a 5, solo si se desprende del relato; si no, null.
 - "reflection": una a tres oraciones en primera persona que resuman el día como lo contó, sin juicios, consejos ni diagnósticos. null si el relato es muy corto.
-- "reply": un mensaje breve y cálido (una o dos oraciones, en español rioplatense) que confirme qué ordenaste. Si falta algo importante, como el horario de una actividad central, preguntalo.
+- "reply": un mensaje breve y cálido (una o dos oraciones, en español rioplatense) que confirme qué ordenaste. Si falta algo importante, como el horario de una actividad central, preguntalo. Si faltan los puntajes de placer y control, recordale que puede agregarlos (por ejemplo "placer 7, control 5").
 
 En la conversación:
 - Te paso las actividades que ya están guardadas ese día: no las repitas.
@@ -44,7 +44,8 @@ const EntrySchema = z.object({
   end: z.string().nullable().describe('Hora de fin HH:MM, o null si no se sabe'),
   activity: z.string().describe('Qué hizo, en pocas palabras'),
   category: z.enum(CATEGORY_IDS),
-  mood: z.number().nullable().describe('Ánimo de 1 a 5, solo si lo expresó'),
+  pleasure: z.number().nullable().describe('Placer de 1 a 10, solo si lo dijo'),
+  control: z.number().nullable().describe('Control o dominio de 1 a 10, solo si lo dijo'),
   notes: z.string().nullable(),
 });
 
