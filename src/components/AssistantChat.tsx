@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, Check, LifeBuoy, Mic, MicOff, Sparkles, X } from 'lucide-react';
+import { ArrowUp, Check, LifeBuoy, Mic, Plus, Sparkles, X } from 'lucide-react';
 import type { DayLog } from '../types';
 import { getCategory, moodInfo } from '../lib/categories';
-import { longDate, weekdayLong } from '../lib/date';
+import { longDate, parseISODate, weekdayLong, weekdayShort } from '../lib/date';
 import { organizeDay, type ChatTurn, type OrganizeResult } from '../lib/organize';
 import { actions, newId } from '../lib/store';
+import { CategoryAvatar, Menu, RoundCheck } from './common';
 
 export type ChatMessage =
   | { id: string; role: 'user'; text: string }
@@ -24,8 +25,21 @@ const MAX_HISTORY_TURNS = 30;
 const MAX_MESSAGE_LENGTH = 8000;
 
 const EXAMPLES = [
-  'Me levanté a las 8 y desayuné. De 9 a 13 trabajé, me costó concentrarme.',
-  'A la tarde fui al gimnasio y a la noche cené con amigos, me sentí bien.',
+  {
+    label: 'Día con horarios',
+    hint: 'Con horas de inicio y fin',
+    text: 'Me levanté a las 8 y desayuné. De 9 a 13 trabajé, me costó concentrarme. A las 18 fui al gimnasio.',
+  },
+  {
+    label: 'Día sin horarios',
+    hint: 'La IA estima las horas',
+    text: 'A la mañana limpié la casa, a la tarde fui a terapia y a la noche cené con amigos. Me sentí bien.',
+  },
+  {
+    label: 'Día difícil',
+    hint: 'Con emociones y pensamientos',
+    text: 'Dormí mal y me levanté tarde, tipo 11. Me angustié después de hablar con mi mamá, a la tarde salí a caminar y me ayudó un poco.',
+  },
 ];
 
 function toHistory(messages: ChatMessage[]): ChatTurn[] {
@@ -187,21 +201,20 @@ export function AssistantChat({
   }
 
   const dayName = weekdayLong(date).toLowerCase();
+  const dayChip = `${weekdayShort(date)} ${parseISODate(date).getDate()}`;
 
   return (
     <div className="assistant">
       <div className="assistant-head">
+        <span className="assistant-icon" aria-hidden>
+          <Sparkles />
+        </span>
         <div>
-          <h2>
-            <Sparkles aria-hidden />
-            Contale tu día
-          </h2>
-          <p>
-            Contá cómo fue tu {dayName} con tus palabras y lo ordeno en actividades. Vos revisás antes de guardar.
-          </p>
+          <h2>Contale tu día</h2>
+          <p>Lo ordeno en actividades y vos revisás antes de guardar.</p>
         </div>
         {onClose && (
-          <button type="button" className="icon-btn sm" onClick={onClose} aria-label="Cerrar chat">
+          <button type="button" className="circle-btn sm" onClick={onClose} aria-label="Cerrar chat">
             <X />
           </button>
         )}
@@ -243,39 +256,49 @@ export function AssistantChat({
       </div>
 
       <div className="composer">
-        {messages.length === 0 && !text && (
-          <div className="suggestions" aria-label="Ejemplos">
-            {EXAMPLES.map((ex) => (
-              <button key={ex} type="button" onClick={() => setText(ex)}>
-                {ex.length > 46 ? `${ex.slice(0, 46)}…` : ex}
-              </button>
-            ))}
+        <div className="tray">
+          <div className="tray-card composer-card">
+            <textarea
+              ref={inputRef}
+              rows={2}
+              value={text}
+              maxLength={MAX_MESSAGE_LENGTH}
+              placeholder={listening ? 'Te escucho…' : `¿Cómo fue tu ${dayName}?`}
+              aria-label="Contale tu día a la IA"
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={onKeyDown}
+            />
           </div>
-        )}
-        <div className="composer-box">
-          <textarea
-            ref={inputRef}
-            rows={1}
-            value={text}
-            maxLength={MAX_MESSAGE_LENGTH}
-            placeholder={listening ? 'Te escucho…' : `¿Cómo fue tu ${dayName}?`}
-            aria-label="Contale tu día a la IA"
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={onKeyDown}
-          />
-          <div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+          <div className="tray-foot">
+            <Menu
+              label="Ejemplos para empezar"
+              triggerClassName="circle-btn"
+              trigger={<Plus aria-hidden />}
+              align="start"
+              placement="top"
+              items={EXAMPLES.map((ex) => ({
+                label: ex.label,
+                hint: ex.hint,
+                selected: text === ex.text,
+                onSelect: () => {
+                  setText(ex.text);
+                  inputRef.current?.focus();
+                },
+              }))}
+            />
             {SpeechRecognition && (
               <button
                 type="button"
-                className="icon-btn"
+                className={`chip${listening ? ' is-live' : ''}`}
                 onClick={toggleDictation}
                 aria-pressed={listening}
-                aria-label={listening ? 'Detener dictado' : 'Dictar por voz'}
-                style={listening ? { color: 'var(--accent)', background: 'var(--accent-soft)' } : undefined}
               >
-                {listening ? <MicOff /> : <Mic />}
+                {listening ? <span className="live-dot" aria-hidden /> : <Mic aria-hidden />}
+                {listening ? 'Escuchando' : 'Dictar'}
               </button>
             )}
+            <span className="chip chip-static">{dayChip}</span>
+            <span className="spacer" />
             <button
               type="button"
               className="send-btn"
@@ -319,7 +342,7 @@ function Proposal({
       {result.notice && <p className="msg-notice">{result.notice}</p>}
 
       {hasContent && (
-        <div className="proposal" style={m.status === 'discarded' || m.status === 'replaced' ? { opacity: 0.55 } : undefined}>
+        <div className={`proposal${m.status === 'discarded' || m.status === 'replaced' ? ' is-faded' : ''}`}>
           {result.entries.length > 0 && (
             <ul className="proposal-list">
               {result.entries.map((e, i) => (
@@ -327,30 +350,29 @@ function Proposal({
                   <label className="proposal-item">
                     <input
                       type="checkbox"
+                      className="sr-only"
                       checked={m.selected[i]}
                       disabled={m.status !== 'pending'}
                       onChange={(ev) =>
                         onUpdate({ selected: m.selected.map((s, j) => (j === i ? ev.target.checked : s)) })
                       }
                     />
-                    <span className="time">
-                      {e.start}
-                      {e.end && (
-                        <>
-                          <br />
-                          <small className="muted">{e.end}</small>
-                        </>
-                      )}
-                    </span>
+                    <CategoryAvatar id={e.category} />
                     <span className="what">
-                      <span>
+                      <span className="what-title">
                         {e.activity} {moodInfo(e.mood)?.emoji}
                       </span>
                       <small>
+                        <span className="tabular">
+                          {e.start}
+                          {e.end ? ` – ${e.end}` : ''}
+                        </span>
+                        {' · '}
                         {getCategory(e.category).label}
                         {e.notes ? ` · ${e.notes}` : ''}
                       </small>
                     </span>
+                    <RoundCheck checked={m.selected[i]} />
                   </label>
                 </li>
               ))}
@@ -359,38 +381,52 @@ function Proposal({
           {(mood || result.reflection) && (
             <div className="proposal-extra">
               {mood && (
-                <label>
+                <label className="proposal-item">
                   <input
                     type="checkbox"
+                    className="sr-only"
                     checked={m.applyMood}
                     disabled={m.status !== 'pending'}
                     onChange={(e) => onUpdate({ applyMood: e.target.checked })}
                   />
-                  <span>
-                    Ánimo del día: {mood.emoji} {mood.label}
+                  <span className="avatar avatar-plain" aria-hidden>
+                    {mood.emoji}
                   </span>
+                  <span className="what">
+                    <span className="what-title">Ánimo del día</span>
+                    <small>{mood.label}</small>
+                  </span>
+                  <RoundCheck checked={m.applyMood} />
                 </label>
               )}
               {result.reflection && (
-                <label>
+                <label className="proposal-item">
                   <input
                     type="checkbox"
+                    className="sr-only"
                     checked={m.applyReflection}
                     disabled={m.status !== 'pending'}
                     onChange={(e) => onUpdate({ applyReflection: e.target.checked })}
                   />
-                  <span>Reflexión: “{result.reflection}”</span>
+                  <span className="avatar avatar-plain" aria-hidden>
+                    ✍️
+                  </span>
+                  <span className="what">
+                    <span className="what-title">Reflexión</span>
+                    <small>“{result.reflection}”</small>
+                  </span>
+                  <RoundCheck checked={m.applyReflection} />
                 </label>
               )}
             </div>
           )}
           {m.status === 'pending' ? (
             <div className="proposal-foot">
-              <button type="button" className="btn btn-sm btn-ghost" onClick={() => onUpdate({ status: 'discarded' })}>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => onUpdate({ status: 'discarded' })}>
                 Descartar
               </button>
-              <button type="button" className="btn btn-sm btn-primary" onClick={onApply} disabled={!canApply}>
-                <Check />
+              <button type="button" className="btn btn-primary btn-sm" onClick={onApply} disabled={!canApply}>
+                <Check aria-hidden />
                 {count > 0 ? `Agregar ${count} al día` : 'Guardar en el día'}
               </button>
             </div>
@@ -398,7 +434,7 @@ function Proposal({
             <div className="proposal-status">
               {m.status === 'added' ? (
                 <>
-                  <Check aria-hidden /> Guardado en el día
+                  <RoundCheck checked /> Guardado en el día
                 </>
               ) : m.status === 'replaced' ? (
                 'Reemplazada por la propuesta nueva'

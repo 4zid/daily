@@ -1,13 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Printer } from 'lucide-react';
-import type { PatientDataset } from '../types';
-import { MOODS, moodInfo } from '../lib/categories';
-import { formatDuration, formatHours, isoWeekNumber, parseISODate, weekRangeLabel, longDate } from '../lib/date';
+import { ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, NotebookPen, Printer } from 'lucide-react';
+import type { CategoryId, PatientDataset } from '../types';
+import { CATEGORIES, MOODS, getCategory, moodInfo } from '../lib/categories';
+import {
+  formatDuration,
+  formatHours,
+  isoWeekNumber,
+  longDate,
+  parseISODate,
+  weekRangeLabel,
+  weekdayShort,
+} from '../lib/date';
 import { weekStats, withDurations } from '../lib/stats';
-import { CategoryLabel } from './common';
-import { CategoryBars, MoodChart } from './Charts';
+import { CategoryAvatar, CategoryPill, Menu } from './common';
+import { CategoryBars, DaySegments, MoodColumns } from './Charts';
 
 export type DataSource = 'local' | 'link' | 'file';
+
+function fmt(n: number): string {
+  return n.toLocaleString('es-AR', { maximumFractionDigits: 1 });
+}
 
 export function TherapistView({
   dataset,
@@ -27,8 +39,11 @@ export function TherapistView({
   onBackToLocal: () => void;
 }) {
   const stats = useMemo(() => weekStats(dataset.days, week), [dataset.days, week]);
+  const [filter, setFilter] = useState<CategoryId | 'todas'>('todas');
   const name = dataset.patientName.trim();
   const avgMood = stats.avgMood ? MOODS[Math.round(stats.avgMood) - 1] : null;
+  const constancy = Math.round((stats.daysWithEntries / 7) * 100);
+  const usedCategories = new Set(stats.minutesByCategory.map((c) => c.id));
 
   return (
     <div className="main-inner">
@@ -42,163 +57,252 @@ export function TherapistView({
                 de <strong>{name}</strong>
               </>
             ) : null}
-            . Los datos no se guardan en este dispositivo.
+            . No se guarda en este dispositivo.
           </span>
           <button type="button" className="btn btn-sm" onClick={onBackToLocal}>
-            Ver los datos de este dispositivo
+            Ver datos de este dispositivo
           </button>
         </div>
       )}
 
-      <header className="report-head">
+      <header className="page-head">
         <div>
-          <p className="eyebrow">Registro semanal{name ? ` · ${name}` : ''}</p>
-          <div className="week-title">
-            <h1>
-              Semana {isoWeekNumber(week)} · {weekRangeLabel(week)} {parseISODate(week).getFullYear()}
-            </h1>
-            <span className="no-print" style={{ display: 'inline-flex' }}>
-              <button type="button" className="icon-btn" onClick={() => onWeekStep(-1)} aria-label="Semana anterior">
-                <ChevronLeft />
-              </button>
-              <button type="button" className="icon-btn" onClick={() => onWeekStep(1)} aria-label="Semana siguiente">
-                <ChevronRight />
-              </button>
-            </span>
-          </div>
+          <p className="kicker">
+            Informe semanal{name ? <> · <b>{name}</b></> : null} · Semana <b>{isoWeekNumber(week)}</b>
+          </p>
+          <h1 className="display">
+            {weekRangeLabel(week)} <span className="display-soft">{parseISODate(week).getFullYear()}</span>
+          </h1>
         </div>
-        <div className="week-actions no-print">
-          <button type="button" className="btn" onClick={() => window.print()}>
-            <Printer />
+        <div className="page-actions no-print">
+          <div className="arrows">
+            <button type="button" className="circle-btn" onClick={() => onWeekStep(-1)} aria-label="Semana anterior">
+              <ChevronLeft />
+            </button>
+            <button type="button" className="circle-btn" onClick={() => onWeekStep(1)} aria-label="Semana siguiente">
+              <ChevronRight />
+            </button>
+          </div>
+          <button type="button" className="btn btn-primary" onClick={() => window.print()}>
+            <Printer aria-hidden />
             Imprimir / PDF
           </button>
         </div>
       </header>
 
-      <section className="stats" aria-label="Resumen de la semana">
-        <div className="card stat">
-          <span className="stat-label">Días con registro</span>
-          <span className="stat-value">
-            {stats.daysWithEntries} <small>/ 7</small>
-          </span>
-        </div>
-        <div className="card stat">
-          <span className="stat-label">Actividades</span>
-          <span className="stat-value">{stats.totalEntries}</span>
-        </div>
-        <div className="card stat">
-          <span className="stat-label">Tiempo registrado</span>
-          <span className="stat-value">{stats.totalMinutes ? formatHours(stats.totalMinutes) : '—'}</span>
-        </div>
-        <div className="card stat">
-          <span className="stat-label">Ánimo promedio</span>
-          <span className="stat-value">
-            {stats.avgMood && avgMood ? (
-              <>
-                {stats.avgMood.toLocaleString('es-AR', { maximumFractionDigits: 1 })}{' '}
-                <small>
-                  {avgMood.emoji} {avgMood.label}
-                </small>
-              </>
-            ) : (
-              '—'
-            )}
-          </span>
-        </div>
-      </section>
+      <div className="grid-2 hero-row">
+        <section className="hero-card" aria-label="Resumen de la semana">
+          <svg className="hero-art" viewBox="0 0 400 300" aria-hidden preserveAspectRatio="xMaxYMin slice">
+            <circle cx="120" cy="40" r="120" />
+            <circle cx="300" cy="300" r="190" />
+            <circle cx="345" cy="232" r="18" />
+            <circle className="fill" cx="250" cy="30" r="2.5" />
+            <circle className="fill" cx="30" cy="110" r="2.5" />
+          </svg>
+          <div className="hero-top">
+            <span className="pill-outline">Resumen</span>
+            <a className="circle-btn on-color" href="#registro-semana" aria-label="Ir al registro de la semana">
+              <ArrowUpRight />
+            </a>
+          </div>
+          {stats.totalEntries > 0 || avgMood ? (
+            <div className="hero-text">
+              <p className="hero-title">
+                {avgMood ? (
+                  <>
+                    Ánimo promedio {fmt(stats.avgMood!)} · {avgMood.label}
+                  </>
+                ) : (
+                  'Semana sin registro de ánimo'
+                )}
+              </p>
+              <p className="hero-sub">
+                {stats.totalEntries} actividad{stats.totalEntries === 1 ? '' : 'es'} en {stats.daysWithEntries} día
+                {stats.daysWithEntries === 1 ? '' : 's'}
+                {stats.totalMinutes ? ` · ${formatHours(stats.totalMinutes)} registradas` : ''}
+              </p>
+            </div>
+          ) : (
+            <div className="hero-text">
+              <p className="hero-title">Todavía no hay registros en esta semana</p>
+              <p className="hero-sub">Pedile a tu paciente el link para compartir o el archivo de respaldo.</p>
+            </div>
+          )}
+        </section>
+
+        <section className="card stat-card" aria-labelledby="constancy-title">
+          <h3 id="constancy-title" className="h3">
+            Constancia
+          </h3>
+          <div className="stat-line">
+            <span className="big-number">{constancy}%</span>
+            <span className="soft-pill">
+              {stats.daysWithEntries} de 7 días
+            </span>
+          </div>
+          <DaySegments dates={stats.dates} days={dataset.days} />
+          <div className="stat-foot no-print">
+            <span className="lbl">Para la sesión:</span>
+            <div className="row">
+              <button type="button" className="btn btn-sm" onClick={() => window.print()}>
+                Imprimir
+                <Printer aria-hidden />
+              </button>
+              <a className="btn btn-sm" href="#notas-sesion">
+                Notas
+                <NotebookPen aria-hidden />
+              </a>
+            </div>
+          </div>
+        </section>
+      </div>
 
       {stats.totalEntries > 0 || stats.avgMood ? (
-        <section className="charts">
-          <div className="card chart-card">
-            <header>
-              <h3>Ánimo por día</h3>
-              <p>De 1 (muy mal) a 5 (muy bien). Las columnas claras son el promedio de las actividades.</p>
+        <div className="grid-2">
+          <section className="card chart-card" aria-labelledby="mood-title">
+            <header className="card-head">
+              <div>
+                <h3 id="mood-title" className="h3">
+                  Ánimo por día
+                </h3>
+                <p className="sub">De 1 (muy mal) a 5 (muy bien)</p>
+              </div>
+              <span className="soft-pill">Lun – Dom</span>
             </header>
-            <MoodChart data={stats.moodByDay} />
-          </div>
-          <div className="card chart-card">
-            <header>
-              <h3>Tiempo por categoría</h3>
-              <p>Horas en la semana. Sin hora de fin, cada actividad cuenta hasta la siguiente (máx. 4 h).</p>
+            <MoodColumns data={stats.moodByDay} average={stats.avgMood} />
+            <p className="chart-note">Las columnas con borde punteado salen del promedio de las actividades.</p>
+          </section>
+
+          <section className="card chart-card" aria-labelledby="time-title">
+            <header className="card-head">
+              <div>
+                <h3 id="time-title" className="h3">
+                  Tiempo por categoría
+                </h3>
+                <p className="sub">Sin hora de fin, cada actividad cuenta hasta la siguiente (máx. 4 h)</p>
+              </div>
             </header>
             {stats.minutesByCategory.length ? (
               <CategoryBars data={stats.minutesByCategory} totalMinutes={stats.totalMinutes} />
             ) : (
-              <p className="day-empty">Sin actividades.</p>
+              <p className="sub">Sin actividades.</p>
             )}
-          </div>
-        </section>
-      ) : (
-        <div className="card empty">
-          <p>No hay registros en esta semana.</p>
+          </section>
         </div>
-      )}
+      ) : null}
 
-      <section className="days-report" aria-label="Detalle por día">
-        {stats.dates.map((date) => {
-          const day = dataset.days[date];
-          const entries = withDurations(day?.entries ?? []);
-          const mood = moodInfo(day?.mood);
-          const hasContent = entries.length > 0 || day?.reflection || mood;
-          return (
-            <article key={date} className="card day-report">
-              <div className="day-report-head" style={hasContent ? undefined : { marginBottom: 0 }}>
-                <h3>{longDate(date)}</h3>
-                {mood ? (
-                  <span className="chip">
-                    {mood.emoji} Día: {mood.label}
-                  </span>
-                ) : !hasContent ? (
-                  <span className="day-empty">Sin registros</span>
-                ) : null}
-              </div>
-              {entries.length > 0 && (
-                <table className="entries-table">
-                  <thead>
-                    <tr>
-                      <th className="col-time">Horario</th>
-                      <th>Actividad</th>
-                      <th className="col-cat">Categoría</th>
-                      <th className="col-mood">Ánimo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map((e) => {
-                      const em = moodInfo(e.mood);
-                      return (
-                        <tr key={e.id}>
-                          <td className="col-time">
-                            {e.start}
-                            {e.end ? ` – ${e.end}` : ''}
-                            {!e.end && e.minutes ? (
-                              <span className="notes" title="Hasta la siguiente actividad">
-                                ≈ {formatDuration(e.minutes)}
-                              </span>
-                            ) : null}
-                          </td>
-                          <td>
-                            {e.activity}
-                            {e.notes && <span className="notes">{e.notes}</span>}
-                          </td>
-                          <td className="col-cat">
-                            <CategoryLabel id={e.category} />
-                          </td>
-                          <td className="col-mood" title={em?.label}>
-                            {em ? em.emoji : <span className="muted">—</span>}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-              {day?.reflection && <blockquote className="quote">{day.reflection}</blockquote>}
-            </article>
-          );
-        })}
+      <section className="card list-card" id="registro-semana" aria-labelledby="log-title">
+        <header className="card-head">
+          <div>
+            <h3 id="log-title" className="h3">
+              Registro de la semana
+            </h3>
+            <p className="sub">
+              {longDate(stats.dates[0])} – {longDate(stats.dates[6])}
+            </p>
+          </div>
+          {usedCategories.size > 1 && (
+            <Menu
+              label="Filtrar por categoría"
+              triggerClassName="btn btn-sm no-print"
+              trigger={
+                <>
+                  {filter === 'todas' ? 'Todas las categorías' : getCategory(filter).label}
+                  <ChevronDown aria-hidden />
+                </>
+              }
+              items={[
+                { label: 'Todas las categorías', selected: filter === 'todas', onSelect: () => setFilter('todas') },
+                ...CATEGORIES.filter((c) => usedCategories.has(c.id)).map((c) => ({
+                  label: c.label,
+                  selected: filter === c.id,
+                  onSelect: () => setFilter(c.id),
+                })),
+              ]}
+            />
+          )}
+        </header>
+
+        <WeekLog dataset={dataset} dates={stats.dates} filter={filter} />
       </section>
 
       <TherapistNotes key={`${dataset.patientName}|${week}`} value={note} onChange={onNote} />
+    </div>
+  );
+}
+
+function WeekLog({
+  dataset,
+  dates,
+  filter,
+}: {
+  dataset: PatientDataset;
+  dates: string[];
+  filter: CategoryId | 'todas';
+}) {
+  const withContent = dates.filter((date) => {
+    const d = dataset.days[date];
+    return d && (d.entries.length || d.reflection || d.mood);
+  });
+  const empty = dates.filter((date) => !withContent.includes(date));
+
+  if (!withContent.length) {
+    return <p className="empty-line">No hay registros en esta semana.</p>;
+  }
+
+  return (
+    <div className="log">
+      {withContent.map((date) => {
+        const day = dataset.days[date]!;
+        const entries = withDurations(day.entries).filter((e) => filter === 'todas' || e.category === filter);
+        const mood = moodInfo(day.mood);
+        return (
+          <article key={date} className="log-day">
+            <header className="log-day-head">
+              <h4>{longDate(date)}</h4>
+              {mood && (
+                <span className="pill-tag">
+                  {mood.emoji} Día: {mood.label}
+                </span>
+              )}
+              <span className="sub">
+                {day.entries.length} actividad{day.entries.length === 1 ? '' : 'es'}
+              </span>
+            </header>
+            {entries.length > 0 && (
+              <ul className="items">
+                {entries.map((e) => {
+                  const em = moodInfo(e.mood);
+                  return (
+                    <li key={e.id} className="item is-static">
+                      <CategoryAvatar id={e.category} />
+                      <div className="item-main">
+                        <p className="item-title">{e.activity}</p>
+                        {e.notes && <p className="item-sub item-notes">{e.notes}</p>}
+                      </div>
+                      <span className="item-time tabular">
+                        {e.start}
+                        {e.end ? ` – ${e.end}` : ''}
+                        {!e.end && e.minutes ? <small> ≈ {formatDuration(e.minutes)}</small> : null}
+                      </span>
+                      <span className="item-cat">
+                        <CategoryPill id={e.category} />
+                      </span>
+                      <span className="item-mood" title={em?.label}>
+                        {em ? <span aria-label={`Ánimo: ${em.label}`}>{em.emoji}</span> : <span className="muted">—</span>}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {day.reflection && <blockquote className="quote">{day.reflection}</blockquote>}
+          </article>
+        );
+      })}
+      {empty.length > 0 && (
+        <p className="empty-line">Sin registros: {empty.map((d) => `${weekdayShort(d)} ${parseISODate(d).getDate()}`).join(', ')}</p>
+      )}
     </div>
   );
 }
@@ -213,17 +317,24 @@ function TherapistNotes({ value, onChange }: { value: string; onChange: (note: s
   }, [text, value, onChange]);
 
   return (
-    <section className="card notes-card no-print">
-      <h3>Notas de sesión</h3>
-      <p className="hint">Solo para vos: se guardan en este dispositivo y no se comparten.</p>
-      <textarea
-        className="textarea"
-        rows={4}
-        placeholder="Temas para trabajar, patrones que notaste, preguntas para la próxima sesión…"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => text !== value && onChange(text)}
-      />
+    <section className="tray no-print" id="notas-sesion">
+      <div className="tray-card note-card">
+        <label htmlFor="session-notes" className="h3">
+          Notas de sesión
+        </label>
+        <textarea
+          id="session-notes"
+          className="note-input"
+          rows={4}
+          placeholder="Temas para trabajar, patrones que notaste, preguntas para la próxima sesión…"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => text !== value && onChange(text)}
+        />
+      </div>
+      <div className="tray-foot">
+        <span className="lbl">Solo para vos: se guardan en este dispositivo y no se comparten.</span>
+      </div>
     </section>
   );
 }

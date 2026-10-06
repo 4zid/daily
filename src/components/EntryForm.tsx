@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Check, Plus } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 import type { CategoryId, Entry, Mood } from '../types';
-import { CATEGORIES } from '../lib/categories';
+import { CATEGORIES, categoryColorVar } from '../lib/categories';
+import { formatDuration, timeToMinutes } from '../lib/date';
 import { actions } from '../lib/store';
 import { MoodPicker } from './common';
 
@@ -25,6 +26,14 @@ function fromEntry(e: Entry): Draft {
     mood: e.mood,
     notes: e.notes ?? '',
   };
+}
+
+function durationLabel(start: string, end: string): string {
+  const a = timeToMinutes(start);
+  const b = timeToMinutes(end);
+  if (a === null) return 'Elegí el horario';
+  if (b === null) return 'Hasta la siguiente';
+  return formatDuration(b >= a ? b - a : b + 24 * 60 - a);
 }
 
 export function EntryForm({
@@ -69,77 +78,89 @@ export function EntryForm({
   }
 
   return (
-    <form className="card entry-form" onSubmit={submit} aria-label={editing ? 'Editar actividad' : 'Nueva actividad'}>
-      <div className="entry-form-row">
-        <label className="field">
-          <span>Inicio</span>
+    <form className="tray entry-tray" onSubmit={submit} aria-label={editing ? 'Editar actividad' : 'Nueva actividad'}>
+      <div className="tray-card entry-card">
+        <div className="time-row">
+          <label className="time-field">
+            <span className="lbl">Inicio</span>
+            <input
+              className={`time-input${draft.start ? '' : ' is-empty'}`}
+              type="time"
+              required
+              value={draft.start}
+              onChange={(e) => set('start', e.target.value)}
+            />
+          </label>
+          <span className="duration-pill" aria-live="polite">
+            {durationLabel(draft.start, draft.end)}
+          </span>
+          <label className="time-field is-end">
+            <span className="lbl">
+              Fin <em>opcional</em>
+            </span>
+            <input
+              className={`time-input${draft.end ? '' : ' is-empty'}`}
+              type="time"
+              value={draft.end}
+              onChange={(e) => set('end', e.target.value)}
+            />
+          </label>
+        </div>
+
+        <label className="activity-field">
+          <span className="lbl">¿Qué hiciste?</span>
           <input
-            className="input"
-            type="time"
-            required
-            value={draft.start}
-            onChange={(e) => set('start', e.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>Fin (opcional)</span>
-          <input className="input" type="time" value={draft.end} onChange={(e) => set('end', e.target.value)} />
-        </label>
-        <label className="field field-activity">
-          <span>¿Qué hiciste?</span>
-          <input
-            className="input"
+            className="big-input"
             type="text"
             required
             maxLength={200}
-            placeholder="Ej.: Desayuné con mi hermana"
+            placeholder="Desayuné con mi hermana"
             value={draft.activity}
             onChange={(e) => set('activity', e.target.value)}
           />
         </label>
-        <label className="field field-category">
-          <span>Categoría</span>
-          <select
-            className="select"
-            value={draft.category}
-            onChange={(e) => set('category', e.target.value as CategoryId)}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </label>
+
+        <div className="chip-scroll" role="radiogroup" aria-label="Categoría">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="radio"
+              aria-checked={draft.category === c.id}
+              className="chip"
+              onClick={() => set('category', c.id)}
+            >
+              <span className="dot" style={{ background: categoryColorVar(c.id) }} aria-hidden />
+              {c.label}
+            </button>
+          ))}
+        </div>
+
+        <input
+          className="soft-input"
+          type="text"
+          maxLength={1000}
+          aria-label="Notas: qué sentiste o pensaste"
+          placeholder="Notas: qué sentiste o pensaste (opcional)"
+          value={draft.notes}
+          onChange={(e) => set('notes', e.target.value)}
+        />
       </div>
-      <div className="entry-form-row2">
-        <label className="field">
-          <span>Notas: qué sentiste o pensaste (opcional)</span>
-          <input
-            className="input"
-            type="text"
-            maxLength={1000}
-            placeholder="Ej.: Me costó arrancar, después me sentí mejor"
-            value={draft.notes}
-            onChange={(e) => set('notes', e.target.value)}
-          />
-        </label>
-        <div className="field">
-          <span>¿Cómo te sentiste?</span>
+
+      <div className="tray-foot">
+        <div className="tray-foot-start">
+          <span className="lbl">¿Cómo te sentiste?</span>
           <MoodPicker size="sm" label="Ánimo en esta actividad" value={draft.mood} onChange={(m) => set('mood', m)} />
         </div>
-      </div>
-      <div className="entry-form-foot">
-        <p className="hint">Sin hora de fin, cuenta hasta la siguiente actividad (si empieza dentro de las 4 h).</p>
-        <div className="row">
+        <div className="tray-foot-end">
           {editing && (
-            <button type="button" className="btn" onClick={onDone}>
+            <button type="button" className="btn btn-ghost" onClick={onDone}>
               Cancelar
             </button>
           )}
-          <button type="submit" className="btn btn-primary" disabled={!canSave}>
-            {editing ? <Check /> : <Plus />}
-            {editing ? 'Guardar cambios' : 'Agregar actividad'}
+          <button type="submit" className="go-btn" disabled={!canSave}>
+            {editing ? 'Guardar' : 'Agregar'}
+            {editing ? <Check aria-hidden /> : <ArrowRight aria-hidden />}
           </button>
         </div>
       </div>

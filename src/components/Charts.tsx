@@ -1,108 +1,69 @@
-import { useState, type MouseEvent } from 'react';
+import { useState } from 'react';
+import type { DayLog } from '../types';
 import { categoryColorVar, getCategory, MOODS } from '../lib/categories';
 import { formatHours, longDate, weekdayShort } from '../lib/date';
 import type { WeekStats } from '../lib/stats';
 
-interface Tip {
-  x: number;
-  y: number;
-  lines: [string, string?];
-}
-
-function Tooltip({ tip }: { tip: Tip | null }) {
-  if (!tip) return null;
-  return (
-    <div className="tooltip" style={{ left: tip.x, top: tip.y }} role="tooltip">
-      <strong>{tip.lines[0]}</strong>
-      {tip.lines[1] && (
-        <>
-          <br />
-          {tip.lines[1]}
-        </>
-      )}
-    </div>
-  );
+function fmt(n: number): string {
+  return n.toLocaleString('es-AR', { maximumFractionDigits: 1 });
 }
 
 function moodText(mood: number): string {
   const rounded = MOODS[Math.min(4, Math.max(0, Math.round(mood) - 1))];
-  const value = Number.isInteger(mood) ? String(mood) : mood.toLocaleString('es-AR', { maximumFractionDigits: 1 });
-  return `${rounded.emoji} ${rounded.label} (${value})`;
+  return `${rounded.emoji} ${rounded.label} (${fmt(mood)})`;
 }
 
-// Columnas de ánimo (1–5) de lunes a domingo. Una sola serie: el título la nombra.
-export function MoodChart({ data }: { data: WeekStats['moodByDay'] }) {
-  const [tip, setTip] = useState<Tip | null>(null);
-  const W = 360;
-  const H = 190;
-  const pad = { top: 10, right: 6, bottom: 26, left: 40 };
-  const plotW = W - pad.left - pad.right;
-  const plotH = H - pad.top - pad.bottom;
-  const band = plotW / data.length;
-  const barW = Math.min(24, band * 0.5);
-  const y = (v: number) => pad.top + plotH - (v / 5) * plotH;
-  const r = 4;
-
-  function show(e: MouseEvent<SVGRectElement>, i: number) {
-    const d = data[i];
-    const box = (e.currentTarget.ownerSVGElement as SVGSVGElement).getBoundingClientRect();
-    const scale = box.width / W;
-    const cx = (pad.left + band * i + band / 2) * scale;
-    const top = (d.mood ? y(d.mood) : y(0)) * scale;
-    setTip({
-      x: cx,
-      y: top,
-      lines: [
-        longDate(d.date),
-        d.mood ? `${moodText(d.mood)}${d.fromEntries ? ' · promedio de actividades' : ''}` : 'Sin registro de ánimo',
-      ],
-    });
-  }
+/**
+ * Columnas de ánimo (1–5) de lunes a domingo. El día más alto se destaca con
+ * relleno rayado; la línea punteada marca el promedio de la semana.
+ */
+export function MoodColumns({ data, average }: { data: WeekStats['moodByDay']; average: number | null }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const values = data.map((d) => d.mood ?? 0);
+  const max = Math.max(...values);
+  const top = max > 0 ? values.indexOf(max) : -1;
 
   return (
-    <div className="chart-wrap" onMouseLeave={() => setTip(null)}>
-      <svg className="chart-svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Ánimo por día de la semana">
-        {[1, 2, 3, 4, 5].map((v) => (
-          <g key={v}>
-            <line x1={pad.left} x2={W - pad.right} y1={y(v)} y2={y(v)} stroke="var(--grid)" strokeWidth={1} />
-            <text x={pad.left - 8} y={y(v)} textAnchor="end" dominantBaseline="middle">
-              {MOODS[v - 1].emoji} {v}
-            </text>
-          </g>
-        ))}
-        <line x1={pad.left} x2={W - pad.right} y1={y(0)} y2={y(0)} stroke="var(--axis)" strokeWidth={1} />
+    <div className="columns-chart" onMouseLeave={() => setHover(null)}>
+      <div className="columns-plot">
+        {average !== null && (
+          <div className="avg-line" style={{ bottom: `${(average / 5) * 100}%` }}>
+            <span className="avg-tag">Promedio {fmt(average)}</span>
+          </div>
+        )}
         {data.map((d, i) => {
-          const cx = pad.left + band * i + band / 2;
-          const x0 = cx - barW / 2;
-          const top = d.mood ? y(d.mood) : y(0);
-          const base = y(0);
-          const h = base - top;
+          const has = d.mood !== null;
           return (
-            <g key={d.date}>
-              {d.mood && h > 0 && (
-                <path
-                  d={`M${x0},${base} V${top + r} Q${x0},${top} ${x0 + r},${top} H${x0 + barW - r} Q${x0 + barW},${top} ${x0 + barW},${top + r} V${base} Z`}
-                  fill="var(--accent)"
-                  opacity={d.fromEntries ? 0.55 : 1}
-                />
-              )}
-              <text x={cx} y={H - 8} textAnchor="middle">
-                {weekdayShort(d.date)}
-              </text>
-              <rect
-                x={pad.left + band * i}
-                y={pad.top}
-                width={band}
-                height={plotH}
-                fill="transparent"
-                onMouseEnter={(e) => show(e, i)}
-                onMouseMove={(e) => show(e, i)}
-              />
-            </g>
+            <div
+              key={d.date}
+              className="column"
+              onMouseEnter={() => setHover(i)}
+              onFocus={() => setHover(i)}
+              onBlur={() => setHover(null)}
+              tabIndex={0}
+              aria-label={`${longDate(d.date)}: ${has ? moodText(d.mood!) : 'sin registro de ánimo'}`}
+            >
+              <div
+                className={`col-bar${i === top ? ' is-top' : ''}${has ? '' : ' is-empty'}${d.fromEntries ? ' is-derived' : ''}`}
+                style={{ height: has ? `${(d.mood! / 5) * 100}%` : '14%' }}
+              >
+                {has && <span className="col-value">{fmt(d.mood!)}</span>}
+                {hover === i && (
+                  <span className="col-tip" role="tooltip">
+                    <strong>{longDate(d.date)}</strong>
+                    {has ? `${moodText(d.mood!)}${d.fromEntries ? ' · promedio de actividades' : ''}` : 'Sin registro de ánimo'}
+                  </span>
+                )}
+              </div>
+            </div>
           );
         })}
-      </svg>
-      <Tooltip tip={tip} />
+      </div>
+      <div className="columns-axis" aria-hidden>
+        {data.map((d) => (
+          <span key={d.date}>{weekdayShort(d.date)}</span>
+        ))}
+      </div>
       <table className="sr-only">
         <caption>Ánimo por día</caption>
         <tbody>
@@ -118,31 +79,36 @@ export function MoodChart({ data }: { data: WeekStats['moodByDay'] }) {
   );
 }
 
-// Barras horizontales: horas por categoría. El nombre va siempre visible junto a la barra.
-export function CategoryBars({ data, totalMinutes }: { data: WeekStats['minutesByCategory']; totalMinutes: number }) {
-  const [tip, setTip] = useState<Tip | null>(null);
-  const max = Math.max(...data.map((d) => d.minutes), 1);
-
-  function show(e: MouseEvent<HTMLElement>, i: number) {
-    const d = data[i];
-    const wrap = e.currentTarget.closest('.chart-wrap')!.getBoundingClientRect();
-    const fill = e.currentTarget.querySelector('.hbar-fill')!.getBoundingClientRect();
-    const share = totalMinutes ? Math.round((d.minutes / totalMinutes) * 100) : 0;
-    setTip({
-      x: fill.right - wrap.left,
-      y: fill.top - wrap.top,
-      lines: [
-        getCategory(d.id).label,
-        `${d.count} actividad${d.count === 1 ? '' : 'es'}${d.minutes ? ` · ${formatHours(d.minutes)} (${share}%)` : ''}`,
-      ],
-    });
-  }
-
+/** Barra segmentada de la semana: un tramo por día, lleno si tiene registros. */
+export function DaySegments({ dates, days }: { dates: string[]; days: Record<string, DayLog> }) {
   return (
-    <div className="chart-wrap" onMouseLeave={() => setTip(null)}>
-      <ul className="hbars">
-        {data.map((d, i) => (
-          <li key={d.id} className="hbar" onMouseEnter={(e) => show(e, i)}>
+    <div className="segments" role="list" aria-label="Días con registro">
+      {dates.map((date) => {
+        const on = (days[date]?.entries.length ?? 0) > 0;
+        return (
+          <div key={date} className="segment" role="listitem" aria-label={`${longDate(date)}: ${on ? 'con registro' : 'sin registro'}`}>
+            <span className={`segment-bar${on ? ' is-on' : ''}`} />
+            <span className={`segment-label${on ? ' is-on' : ''}`}>{weekdayShort(date)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Horas por categoría: barras gruesas redondeadas con el valor visible al final. */
+export function CategoryBars({ data, totalMinutes }: { data: WeekStats['minutesByCategory']; totalMinutes: number }) {
+  const max = Math.max(...data.map((d) => d.minutes), 1);
+  return (
+    <ul className="hbars">
+      {data.map((d) => {
+        const share = totalMinutes ? Math.round((d.minutes / totalMinutes) * 100) : 0;
+        return (
+          <li
+            key={d.id}
+            className="hbar"
+            title={`${getCategory(d.id).label}: ${d.count} actividad${d.count === 1 ? '' : 'es'}${d.minutes ? ` · ${formatHours(d.minutes)} (${share}%)` : ''}`}
+          >
             <span className="hbar-label">
               <span className="dot" style={{ background: categoryColorVar(d.id) }} aria-hidden />
               <span>{getCategory(d.id).label}</span>
@@ -150,14 +116,13 @@ export function CategoryBars({ data, totalMinutes }: { data: WeekStats['minutesB
             <span className="hbar-track">
               <span
                 className="hbar-fill"
-                style={{ width: `calc((100% - 64px) * ${d.minutes / max})`, background: categoryColorVar(d.id) }}
+                style={{ width: `${Math.max((d.minutes / max) * 100, 3)}%`, background: categoryColorVar(d.id) }}
               />
-              <span className="hbar-value">{d.minutes ? formatHours(d.minutes) : `${d.count} act.`}</span>
             </span>
+            <span className="hbar-value">{d.minutes ? formatHours(d.minutes) : `${d.count} act.`}</span>
           </li>
-        ))}
-      </ul>
-      <Tooltip tip={tip} />
-    </div>
+        );
+      })}
+    </ul>
   );
 }

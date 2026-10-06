@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FileUp, Settings, Sparkles, Stethoscope, User } from 'lucide-react';
+import { ChartColumn, FileUp, NotebookPen, Send, Settings, Sparkles } from 'lucide-react';
 import type { Entry, PatientDataset } from './types';
 import { addDays, todayISO, weekStart } from './lib/date';
 import { decodeWeek, buildShareUrl } from './lib/share';
@@ -159,144 +159,178 @@ export default function App() {
     [selectedDate],
   );
 
-  return (
-    <div data-view={view}>
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark" aria-hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-              <path d="M5 17h14M8 13a4 4 0 0 1 8 0" />
-            </svg>
-          </span>
-          <span>
-            daily <small>· registro</small>
-          </span>
-        </div>
+  const fileInput = (
+    <input
+      ref={fileRef}
+      type="file"
+      accept="application/json,.json"
+      hidden
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+        if (file) void openPatientFile(file);
+        e.target.value = '';
+      }}
+    />
+  );
 
+  const brand = (
+    <div className="brand">
+      <span className="brand-mark" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+          <path d="M5 16.5h14M8 12.5a4 4 0 0 1 8 0" />
+        </svg>
+      </span>
+      <span>daily</span>
+    </div>
+  );
+
+  return (
+    <div className="app" data-view={view}>
+      <header className="mobile-bar">
+        {brand}
         <div className="segmented" role="group" aria-label="Vista">
           <button type="button" aria-pressed={view === 'paciente'} onClick={() => setHash('paciente')}>
-            <User aria-hidden />
-            Paciente
+            Registro
           </button>
           <button type="button" aria-pressed={view === 'terapeuta'} onClick={() => setHash('terapeuta')}>
-            <Stethoscope aria-hidden />
-            Terapeuta
+            Informe
           </button>
         </div>
-
-        <div className="topbar-end">
-          {view === 'paciente' && (
-            <button type="button" className="who btn-ghost" onClick={() => setSettingsOpen(true)} style={{ border: 0, background: 'none' }}>
-              {data.patientName || 'Agregá tu nombre'}
-            </button>
-          )}
-          <button type="button" className="icon-btn" onClick={() => setSettingsOpen(true)} aria-label="Ajustes">
-            <Settings />
-          </button>
-        </div>
+        <button type="button" className="circle-btn" onClick={() => setSettingsOpen(true)} aria-label="Ajustes">
+          <Settings />
+        </button>
       </header>
 
-      <div className={`layout${view === 'terapeuta' ? ' no-assistant' : ''}`}>
-        <aside className="sidebar" aria-label="Semanas">
-          <div className="sidebar-section weeks">
-            <h2 className="eyebrow">{view === 'paciente' ? 'Tus semanas' : 'Semanas'}</h2>
-            <WeekList
-              weeks={weeks}
-              current={week}
-              thisWeek={thisWeek}
-              days={view === 'terapeuta' ? dataset.days : data.days}
-              onSelect={goToWeek}
-            />
-          </div>
-          <div className="sidebar-section">
-            {view === 'paciente' ? (
-              <p className="sidebar-note">
-                Tus registros se guardan solo en este navegador. Descargá un respaldo desde{' '}
-                <button
-                  type="button"
-                  onClick={() => setSettingsOpen(true)}
-                  style={{ border: 0, padding: 0, background: 'none', color: 'var(--accent)', fontSize: 'inherit' }}
-                >
-                  Ajustes
-                </button>
-                .
-              </p>
-            ) : (
-              <>
-                <button type="button" className="btn" style={{ width: '100%' }} onClick={() => fileRef.current?.click()}>
-                  <FileUp />
-                  Abrir archivo del paciente
-                </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="application/json,.json"
-                  hidden
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void openPatientFile(file);
-                    e.target.value = '';
-                  }}
-                />
-                <p className="sidebar-note" style={{ marginTop: 10 }}>
-                  También podés abrir el link que te comparta tu paciente.
-                </p>
-              </>
-            )}
-          </div>
-        </aside>
-
-        <main className="main">
-          {view === 'paciente' ? (
-            <PatientView
-              days={data.days}
-              week={week}
-              selectedDate={selectedDate}
-              onWeekStep={stepWeek}
-              onToday={() => goToWeek(thisWeek)}
-              onSelectDate={setSelectedDate}
-              onShare={() => void openShare()}
-              onDeleted={onDeleted}
-            />
-          ) : (
-            <TherapistView
-              dataset={dataset}
-              source={source}
-              week={week}
-              note={data.therapistNotes[noteKey] ?? ''}
-              onNote={onNote}
-              onWeekStep={stepWeek}
-              onBackToLocal={backToLocal}
-            />
-          )}
-        </main>
-
-        {view === 'paciente' && (
-          <>
-            <div className={`sheet-backdrop${sheetOpen ? ' open' : ''}`} onClick={() => setSheetOpen(false)} />
-            <aside className={`assistant-col${sheetOpen ? ' open' : ''}`} aria-label="Asistente">
-              <AssistantChat
-                key={selectedDate}
-                date={selectedDate}
-                day={data.days[selectedDate]}
-                messages={chatMessages}
-                onMessages={onMessages}
-                accessCode={data.settings.accessCode}
-                onClose={sheetOpen ? () => setSheetOpen(false) : undefined}
-                onAdded={(count) =>
-                  notify(count ? `Agregaste ${count} actividad${count === 1 ? '' : 'es'} al día.` : 'Guardado en el día.')
-                }
-              />
-            </aside>
-            {!sheetOpen && (
-              <button type="button" className="fab" onClick={() => setSheetOpen(true)}>
-                <Sparkles aria-hidden />
-                Contale tu día
+      <aside className="sidebar" aria-label="Navegación">
+        {brand}
+        <nav className="sidebar-nav">
+          <p className="nav-label">Menú</p>
+          <ul className="nav-list">
+            <li>
+              <button
+                type="button"
+                className="nav-item"
+                aria-current={view === 'paciente' ? 'page' : undefined}
+                onClick={() => setHash('paciente')}
+              >
+                <NotebookPen aria-hidden />
+                <span className="nav-text">Mi registro</span>
               </button>
-            )}
-          </>
+            </li>
+            <li>
+              <button
+                type="button"
+                className="nav-item"
+                aria-current={view === 'terapeuta' ? 'page' : undefined}
+                onClick={() => setHash('terapeuta')}
+              >
+                <ChartColumn aria-hidden />
+                <span className="nav-text">Informe semanal</span>
+              </button>
+            </li>
+          </ul>
+
+          <p className="nav-label">Semanas</p>
+          <WeekList
+            weeks={weeks}
+            current={week}
+            thisWeek={thisWeek}
+            days={view === 'terapeuta' ? dataset.days : data.days}
+            onSelect={goToWeek}
+          />
+
+          <p className="nav-label">General</p>
+          <ul className="nav-list">
+            <li>
+              <button type="button" className="nav-item" onClick={() => setSettingsOpen(true)}>
+                <Settings aria-hidden />
+                <span className="nav-text">Ajustes</span>
+              </button>
+            </li>
+          </ul>
+        </nav>
+
+        {view === 'paciente' ? (
+          <div className="promo">
+            <span className="promo-icon" aria-hidden>
+              <Send />
+            </span>
+            <p className="promo-title">
+              <b>Compartí</b> tu semana
+            </p>
+            <p className="promo-text">Mandale el registro a tu terapeuta con un link.</p>
+            <button type="button" className="promo-btn" onClick={() => void openShare()}>
+              Compartir
+            </button>
+          </div>
+        ) : (
+          <div className="promo">
+            <span className="promo-icon" aria-hidden>
+              <FileUp />
+            </span>
+            <p className="promo-title">
+              <b>Abrí</b> un registro
+            </p>
+            <p className="promo-text">Cargá el archivo de respaldo que te mandó tu paciente.</p>
+            <button type="button" className="promo-btn" onClick={() => fileRef.current?.click()}>
+              Abrir archivo
+            </button>
+          </div>
         )}
-      </div>
+        {fileInput}
+      </aside>
+
+      <main className="main">
+        {view === 'paciente' ? (
+          <PatientView
+            days={data.days}
+            week={week}
+            selectedDate={selectedDate}
+            patientName={data.patientName}
+            onWeekStep={stepWeek}
+            onToday={() => goToWeek(thisWeek)}
+            onSelectDate={setSelectedDate}
+            onShare={() => void openShare()}
+            onDeleted={onDeleted}
+          />
+        ) : (
+          <TherapistView
+            dataset={dataset}
+            source={source}
+            week={week}
+            note={data.therapistNotes[noteKey] ?? ''}
+            onNote={onNote}
+            onWeekStep={stepWeek}
+            onBackToLocal={backToLocal}
+          />
+        )}
+      </main>
+
+      {view === 'paciente' && (
+        <>
+          <div className={`sheet-backdrop${sheetOpen ? ' open' : ''}`} onClick={() => setSheetOpen(false)} />
+          <aside className={`assistant-col${sheetOpen ? ' open' : ''}`} aria-label="Asistente">
+            <AssistantChat
+              key={selectedDate}
+              date={selectedDate}
+              day={data.days[selectedDate]}
+              messages={chatMessages}
+              onMessages={onMessages}
+              accessCode={data.settings.accessCode}
+              onClose={sheetOpen ? () => setSheetOpen(false) : undefined}
+              onAdded={(count) =>
+                notify(count ? `Agregaste ${count} actividad${count === 1 ? '' : 'es'} al día.` : 'Guardado en el día.')
+              }
+            />
+          </aside>
+          {!sheetOpen && (
+            <button type="button" className="fab" onClick={() => setSheetOpen(true)}>
+              <Sparkles aria-hidden />
+              Contale tu día
+            </button>
+          )}
+        </>
+      )}
 
       <SettingsDialog open={settingsOpen} data={data} onClose={() => setSettingsOpen(false)} onToast={notify} />
       <ShareDialog

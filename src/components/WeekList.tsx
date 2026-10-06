@@ -1,3 +1,4 @@
+import { CalendarDays } from 'lucide-react';
 import type { DayLog } from '../types';
 import { isoWeekNumber, weekRangeLabel } from '../lib/date';
 import { countWeekEntries } from '../lib/stats';
@@ -16,27 +17,27 @@ export function WeekList({
   onSelect: (monday: string) => void;
 }) {
   return (
-    <ul className="weeks-list">
+    <ul className="nav-list">
       {weeks.map((monday) => {
         const count = countWeekEntries(days, monday);
         return (
           <li key={monday}>
             <button
               type="button"
-              className="week-item"
-              aria-current={monday === current}
+              className="nav-item"
+              aria-current={monday === current ? 'true' : undefined}
               onClick={() => onSelect(monday)}
             >
-              <span>
-                <span className="week-item-title">
-                  {monday === thisWeek ? 'Esta semana' : `Semana ${isoWeekNumber(monday)}`}
+              <CalendarDays aria-hidden />
+              <span className="nav-text">
+                {monday === thisWeek ? 'Esta semana' : `Semana ${isoWeekNumber(monday)}`}
+                <small>{weekRangeLabel(monday)}</small>
+              </span>
+              {count > 0 && (
+                <span className="nav-badge" title={`${count} actividades`}>
+                  {count > 99 ? '99+' : count}
                 </span>
-                <br />
-                <span className="week-item-range">{weekRangeLabel(monday)}</span>
-              </span>
-              <span className="badge" title={`${count} actividades`}>
-                {count}
-              </span>
+              )}
             </button>
           </li>
         );

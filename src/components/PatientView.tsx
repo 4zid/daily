@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, NotebookPen, Pencil, Send, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Ellipsis, NotebookPen, Send, Sparkles } from 'lucide-react';
 import type { DayLog, Entry } from '../types';
-import { categoryColorVar, moodInfo } from '../lib/categories';
+import { moodInfo } from '../lib/categories';
 import {
   formatDuration,
   isoWeekNumber,
@@ -14,13 +14,14 @@ import {
 } from '../lib/date';
 import { actions } from '../lib/store';
 import { withDurations } from '../lib/stats';
-import { CategoryLabel, MoodPicker } from './common';
+import { CategoryAvatar, CategoryPill, Menu, MoodPicker } from './common';
 import { EntryForm } from './EntryForm';
 
 export function PatientView({
   days,
   week,
   selectedDate,
+  patientName,
   onWeekStep,
   onToday,
   onSelectDate,
@@ -30,6 +31,7 @@ export function PatientView({
   days: Record<string, DayLog>;
   week: string;
   selectedDate: string;
+  patientName: string;
   onWeekStep: (step: number) => void;
   onToday: () => void;
   onSelectDate: (date: string) => void;
@@ -38,34 +40,37 @@ export function PatientView({
 }) {
   const today = todayISO();
   const dates = weekDays(week);
+  const firstName = patientName.trim().split(/\s+/)[0];
 
   return (
     <div className="main-inner">
-      <header className="week-header">
+      <header className="page-head">
         <div>
-          <p className="eyebrow">
-            Semana {isoWeekNumber(week)} · {parseISODate(week).getFullYear()}
+          <p className="kicker">
+            {firstName ? (
+              <>
+                Hola, <b>{firstName}</b> ·{' '}
+              </>
+            ) : null}
+            Semana <b>{isoWeekNumber(week)}</b> · {parseISODate(week).getFullYear()}
           </p>
-          <div className="week-title">
-            <h1>{weekRangeLabel(week)}</h1>
-            <button type="button" className="icon-btn" onClick={() => onWeekStep(-1)} aria-label="Semana anterior">
+          <h1 className="display">{weekRangeLabel(week)}</h1>
+        </div>
+        <div className="page-actions">
+          <div className="arrows">
+            <button type="button" className="circle-btn" onClick={() => onWeekStep(-1)} aria-label="Semana anterior">
               <ChevronLeft />
             </button>
-            <button type="button" className="icon-btn" onClick={() => onWeekStep(1)} aria-label="Semana siguiente">
+            <button type="button" className="circle-btn" onClick={() => onWeekStep(1)} aria-label="Semana siguiente">
               <ChevronRight />
             </button>
           </div>
-        </div>
-        <div className="week-actions">
           <button type="button" className="btn" onClick={onToday}>
-            <CalendarDays />
             Hoy
           </button>
-          <button type="button" className="btn" onClick={onShare}>
-            <Send />
-            <span>
-              Compartir<span className="label-long"> con mi terapeuta</span>
-            </span>
+          <button type="button" className="btn btn-primary" onClick={onShare}>
+            <Send aria-hidden />
+            Compartir
           </button>
         </div>
       </header>
@@ -87,13 +92,8 @@ export function PatientView({
               <span className="day-tile-name">{weekdayShort(date)}</span>
               <span className="day-tile-num">{parseISODate(date).getDate()}</span>
               <span className="day-tile-meta">
-                {mood ? <span aria-hidden>{mood.emoji}</span> : null}
-                {count > 0 ? <span>{count}</span> : <span aria-hidden>·</span>}
-              </span>
-              <span className="day-tile-bars" aria-hidden>
-                {day?.entries.slice(0, 10).map((e) => (
-                  <span key={e.id} style={{ background: categoryColorVar(e.category) }} />
-                ))}
+                {mood && <span aria-hidden>{mood.emoji}</span>}
+                {count > 0 ? <span>{count}</span> : <span className="day-tile-empty" aria-hidden />}
               </span>
             </button>
           );
@@ -118,101 +118,108 @@ function DayPanel({
   const entries = useMemo(() => withDurations(day?.entries ?? []), [day?.entries]);
   const editing = day?.entries.find((e) => e.id === editingId) ?? null;
   const last = day?.entries[day.entries.length - 1];
+  const totalMinutes = entries.reduce((sum, e) => sum + (e.minutes ?? 0), 0);
 
   return (
     <section className="day-panel" aria-labelledby="day-title">
-      <div className="day-head">
-        <h2 id="day-title">{longDate(date)}</h2>
-        <div className="mood-picker-wrap" style={{ display: 'flex', alignItems: 'center' }}>
-          <span className="mood-label">¿Cómo estuvo el día?</span>
+      <div className="section-head">
+        <h2 id="day-title" className="h2">
+          {longDate(date)}
+        </h2>
+        <div className="section-head-end">
+          <span className="lbl">¿Cómo estuvo el día?</span>
           <MoodPicker label="Ánimo general del día" value={day?.mood} onChange={(m) => actions.setDayMood(date, m)} />
         </div>
       </div>
 
-      <EntryForm
-        date={date}
-        editing={editing}
-        suggestedStart={last?.end ?? ''}
-        onDone={() => setEditingId(null)}
-      />
+      <EntryForm date={date} editing={editing} suggestedStart={last?.end ?? ''} onDone={() => setEditingId(null)} />
 
-      <div className="card section-card">
-        {entries.length === 0 ? (
-          <div className="empty">
-            <NotebookPen aria-hidden />
-            <p>Todavía no hay actividades este día.</p>
-            <p className="hint">
-              Cargalas arriba o <Sparkles aria-hidden style={{ width: 14, height: 14, verticalAlign: -2 }} /> contale a la IA
-              cómo fue tu día y ella las ordena.
+      <section className="card list-card" aria-labelledby="activities-title">
+        <header className="card-head">
+          <div>
+            <h3 id="activities-title" className="h3">
+              Actividades
+            </h3>
+            <p className="sub">
+              {entries.length === 0
+                ? 'Todavía no cargaste nada'
+                : `${entries.length} registrada${entries.length === 1 ? '' : 's'}${totalMinutes ? ` · ${formatDuration(totalMinutes)}` : ''}`}
             </p>
           </div>
+        </header>
+
+        {entries.length === 0 ? (
+          <div className="empty">
+            <span className="empty-icon">
+              <NotebookPen aria-hidden />
+            </span>
+            <p>Cargá tu primera actividad arriba o contale a la IA cómo fue tu día.</p>
+          </div>
         ) : (
-          <ol className="timeline">
+          <ul className="items">
             {entries.map((e) => {
               const mood = moodInfo(e.mood);
               return (
-                <li key={e.id} className={`timeline-item${e.id === editingId ? ' is-editing' : ''}`}>
-                  <div className="timeline-time">
-                    <strong>{e.start}</strong>
-                    {e.end ? (
-                      <span>a {e.end}</span>
-                    ) : e.minutes ? (
-                      <span title="Calculado hasta la siguiente actividad">≈ {formatDuration(e.minutes)}</span>
-                    ) : null}
-                  </div>
-                  <div className="timeline-rail" aria-hidden>
-                    <span className="dot" style={{ background: categoryColorVar(e.category) }} />
-                  </div>
-                  <div className="timeline-body">
-                    <div className="timeline-title">
-                      <span>{e.activity}</span>
-                      {mood && (
-                        <span title={mood.label} aria-label={`Ánimo: ${mood.label}`}>
-                          {mood.emoji}
-                        </span>
-                      )}
-                    </div>
-                    <div className="timeline-meta">
-                      <CategoryLabel id={e.category} />
+                <li key={e.id} className={`item${e.id === editingId ? ' is-editing' : ''}`}>
+                  <CategoryAvatar id={e.category} />
+                  <div className="item-main">
+                    <p className="item-title">
+                      {e.activity}
                       {e.source === 'ia' && (
-                        <span className="chip" title="Ordenada con la IA">
-                          <Sparkles style={{ width: 12, height: 12 }} aria-hidden /> IA
+                        <span className="ia-mark" title="Ordenada con la IA">
+                          <Sparkles aria-hidden />
+                          <span className="sr-only">Ordenada con la IA</span>
                         </span>
                       )}
-                    </div>
-                    {e.notes && <p className="timeline-notes">{e.notes}</p>}
+                    </p>
+                    <p className="item-sub">
+                      <span className="tabular">
+                        {e.start}
+                        {e.end ? ` – ${e.end}` : ''}
+                      </span>
+                      {!e.end && e.minutes ? (
+                        <span title="Hasta la siguiente actividad"> · ≈ {formatDuration(e.minutes)}</span>
+                      ) : null}
+                      {e.notes ? <span className="item-notes"> · {e.notes}</span> : null}
+                    </p>
                   </div>
-                  <div className="timeline-actions">
-                    <button
-                      type="button"
-                      className="icon-btn sm"
-                      aria-label={`Editar ${e.activity}`}
-                      onClick={() => {
-                        setEditingId(e.id);
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                    >
-                      <Pencil />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-btn sm"
-                      aria-label={`Borrar ${e.activity}`}
-                      onClick={() => {
-                        if (editingId === e.id) setEditingId(null);
-                        actions.removeEntry(date, e.id);
-                        onDeleted(date, e);
-                      }}
-                    >
-                      <Trash2 />
-                    </button>
-                  </div>
+                  <span className="item-cat">
+                    <CategoryPill id={e.category} />
+                  </span>
+                  <span className="item-mood" title={mood?.label}>
+                    {mood ? <span aria-label={`Ánimo: ${mood.label}`}>{mood.emoji}</span> : null}
+                  </span>
+                  <Menu
+                    label={`Opciones de ${e.activity}`}
+                    triggerClassName="circle-btn ghost sm"
+                    trigger={<Ellipsis aria-hidden />}
+                    items={[
+                      {
+                        label: 'Editar',
+                        hint: 'Cambiar horario, categoría o notas',
+                        onSelect: () => {
+                          setEditingId(e.id);
+                          document.getElementById('day-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        },
+                      },
+                      {
+                        label: 'Borrar',
+                        hint: 'Podés deshacerlo enseguida',
+                        danger: true,
+                        onSelect: () => {
+                          if (editingId === e.id) setEditingId(null);
+                          actions.removeEntry(date, e.id);
+                          onDeleted(date, e);
+                        },
+                      },
+                    ]}
+                  />
                 </li>
               );
             })}
-          </ol>
+          </ul>
         )}
-      </div>
+      </section>
 
       <Reflection date={date} value={day?.reflection ?? ''} />
     </section>
@@ -232,19 +239,25 @@ function Reflection({ date, value }: { date: string; value: string }) {
   }, [text, value, date]);
 
   return (
-    <div className="card reflection">
-      <label htmlFor="reflection">Reflexión del día</label>
-      <p className="hint">¿Qué te gustaría contarle a tu terapeuta sobre este día? Se guarda solo.</p>
-      <textarea
-        id="reflection"
-        className="textarea"
-        rows={3}
-        maxLength={4000}
-        placeholder="Ej.: A la tarde me angustié después de la llamada, pero salir a caminar me ayudó."
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => text !== value && actions.setReflection(date, text)}
-      />
-    </div>
+    <section className="tray">
+      <div className="tray-card note-card">
+        <label htmlFor="reflection" className="h3">
+          Reflexión del día
+        </label>
+        <textarea
+          id="reflection"
+          className="note-input"
+          rows={3}
+          maxLength={4000}
+          placeholder="¿Qué te gustaría contarle a tu terapeuta sobre este día?"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => text !== value && actions.setReflection(date, text)}
+        />
+      </div>
+      <div className="tray-foot">
+        <span className="lbl">Se guarda solo mientras escribís.</span>
+      </div>
+    </section>
   );
 }
