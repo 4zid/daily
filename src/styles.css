@@ -1066,8 +1066,6 @@ svg {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: end;
   gap: 12px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--line);
 }
 
 .time-field {
@@ -1081,41 +1079,199 @@ svg {
   text-align: right;
 }
 
-.time-input {
-  width: 100%;
-  min-width: 0;
-  max-width: 230px;
-  padding: 0;
+.time-block {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Selector de hora (24 h) */
+.time-select {
+  position: relative;
+}
+
+.time-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: -8px;
+  padding: 2px 8px;
   border: 0;
+  border-radius: 14px;
   background: transparent;
+  color: var(--text);
+  transition: background 0.15s;
+}
+
+.time-select.is-end .time-trigger {
+  margin: 0 -8px 0 0;
+}
+
+.time-trigger:hover,
+.time-trigger[aria-expanded='true'] {
+  background: var(--surface-2);
+}
+
+.time-value {
   font-size: 40px;
   font-weight: 400;
   line-height: 1.15;
   letter-spacing: -0.035em;
-  font-variant-numeric: tabular-nums;
+}
+
+.time-trigger.is-empty .time-value {
+  color: var(--text-3);
+}
+
+.time-trigger svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-3);
+  transition: transform 0.15s;
+}
+
+.time-trigger[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+.time-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 30;
+  display: grid;
+  gap: 10px;
+  width: 264px;
+  padding: 10px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+  animation: pop 0.14s ease-out;
+}
+
+.time-pop.is-start {
+  left: -8px;
+}
+
+.time-pop.is-end {
+  right: -8px;
+}
+
+.time-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.time-shortcuts .chip {
+  height: 34px;
+  background: var(--surface-2);
+  box-shadow: none;
+}
+
+.time-shortcuts .chip .muted {
+  font-weight: 400;
+}
+
+.time-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.time-col-wrap {
+  display: grid;
+  gap: 4px;
+}
+
+.time-col-label {
+  padding: 0 10px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.time-col {
+  display: grid;
+  gap: 2px;
+  height: 220px;
+  padding: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.time-option {
+  height: 38px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 16px;
   color: var(--text);
 }
 
-.time-field.is-end .time-input {
-  text-align: right;
+.time-option:hover,
+.time-option:focus-visible {
+  background: var(--surface-2);
 }
 
-.time-input:focus {
+.time-option[aria-selected='true'] {
+  background: var(--ink);
+  color: var(--ink-text);
+}
+
+.time-foot {
+  display: grid;
+  gap: 6px;
+}
+
+.time-foot .btn {
+  width: 100%;
+}
+
+.time-typed {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-typed:focus {
   outline: none;
-}
-
-.time-input:focus-visible {
-  border-radius: 8px;
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-.time-input::-webkit-calendar-picker-indicator {
-  opacity: 0.35;
-  cursor: pointer;
+.quick-durations {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
-.time-input.is-empty {
-  color: var(--text-3);
+.quick-durations .lbl {
+  margin-right: 2px;
+}
+
+.chip-sm {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.entry-card .chip-sm {
+  background: var(--surface-2);
+  box-shadow: none;
+}
+
+.entry-card .chip-sm[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--ink-text);
 }
 
 .duration-pill {
@@ -1764,6 +1920,11 @@ svg {
 .fab,
 .sheet-backdrop {
   display: none;
+}
+
+/* Con un desplegable abierto, el botón flotante no tapa nada. */
+.app:has(.time-pop, .menu) .fab {
+  visibility: hidden;
 }
 
 /* ═════════════════════════ Informe del terapeuta ═════════════════════════ */
@@ -2795,12 +2956,12 @@ dialog.modal::backdrop {
     grid-row: 2;
   }
 
-  .time-input {
-    font-size: 28px;
+  .time-value {
+    font-size: 30px;
   }
 
-  .time-input::-webkit-calendar-picker-indicator {
-    display: none;
+  .time-pop {
+    width: min(264px, calc(100vw - 72px));
   }
 
   .duration-pill {

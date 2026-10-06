@@ -1,10 +1,14 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowRight, Check } from 'lucide-react';
 import type { CategoryId, Entry, Rating } from '../types';
 import { CATEGORIES, categoryColorVar } from '../lib/categories';
-import { formatDuration, timeToMinutes } from '../lib/date';
+import { addMinutes, formatDuration, nowRounded, timeToMinutes } from '../lib/date';
 import { actions } from '../lib/store';
 import { RatingScale } from './common';
+import { TimeSelect, type TimeShortcut } from './TimeSelect';
+
+/** Duraciones rápidas para completar la hora de fin con un toque. */
+const QUICK_DURATIONS = [30, 60, 90, 120, 180];
 
 interface Draft {
   start: string;
@@ -49,23 +53,48 @@ function durationLabel(start: string, end: string): string {
 export function EntryForm({
   date,
   editing,
-  suggestedStart,
+  entries,
+  isToday,
   onDone,
 }: {
   date: string;
   editing: Entry | null;
-  suggestedStart: string;
+  /** Actividades ya cargadas en el día, ordenadas por hora. */
+  entries: Entry[];
+  isToday: boolean;
   onDone: () => void;
 }) {
   const [draft, setDraft] = useState<Draft>(EMPTY);
+  // Mientras no se toque el inicio, sigue la sugerencia (fin de la última actividad).
+  const [startTouched, setStartTouched] = useState(false);
+  const activityRef = useRef<HTMLInputElement>(null);
+  const lastEnd = entries.at(-1)?.end ?? '';
 
   useEffect(() => {
-    setDraft(editing ? fromEntry(editing) : { ...EMPTY, start: suggestedStart });
-    // suggestedStart cambia al agregar; solo se usa al empezar un borrador nuevo.
+    setDraft(editing ? fromEntry(editing) : { ...EMPTY, start: lastEnd });
+    setStartTouched(false);
+    // Solo al cambiar de día o de actividad en edición.
   }, [editing, date]);
 
+  useEffect(() => {
+    if (!editing && !startTouched) setDraft((d) => ({ ...d, start: lastEnd }));
+  }, [lastEnd, editing, startTouched]);
+
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
+  const setStart = (value: string) => {
+    setStartTouched(true);
+    set('start', value);
+  };
   const canSave = draft.start !== '' && draft.activity.trim() !== '';
+
+  const startMin = timeToMinutes(draft.start);
+  const next = entries.find((e) => e.id !== editing?.id && startMin !== null && (timeToMinutes(e.start) ?? -1) > startMin);
+
+  const startShortcuts: TimeShortcut[] = [];
+  if (isToday) startShortcuts.push({ label: 'Ahora', value: nowRounded() });
+  if (lastEnd) startShortcuts.push({ label: 'Fin anterior', value: lastEnd });
+
+  const endShortcuts: TimeShortcut[] = next ? [{ label: 'Hasta la siguiente', value: next.start }] : [];
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -83,44 +112,65 @@ export function EntryForm({
       actions.updateEntry(date, { ...editing, ...entry });
     } else {
       actions.addEntries(date, [{ ...entry, source: 'manual' }]);
+      activityRef.current?.focus();
     }
+    // La próxima actividad arranca donde terminó esta.
     setDraft({ ...EMPTY, start: draft.end || '' });
+    setStartTouched(Boolean(draft.end));
     onDone();
   }
 
   return (
     <form className="tray entry-tray" onSubmit={submit} aria-label={editing ? 'Editar actividad' : 'Nueva actividad'}>
       <div className="tray-card entry-card">
-        <div className="time-row">
-          <label className="time-field">
-            <span className="lbl">Inicio</span>
-            <input
-              className={`time-input${draft.start ? '' : ' is-empty'}`}
-              type="time"
-              required
-              value={draft.start}
-              onChange={(e) => set('start', e.target.value)}
-            />
-          </label>
-          <span className="duration-pill" aria-live="polite">
-            {durationLabel(draft.start, draft.end)}
-          </span>
-          <label className="time-field is-end">
-            <span className="lbl">
-              Fin <em>opcional</em>
+        <div className="time-block">
+          <div className="time-row">
+            <div className="time-field">
+              <span className="lbl">Inicio</span>
+              <TimeSelect label="Inicio" value={draft.start} onChange={setStart} shortcuts={startShortcuts} />
+            </div>
+            <span className="duration-pill" aria-live="polite">
+              {durationLabel(draft.start, draft.end)}
             </span>
-            <input
-              className={`time-input${draft.end ? '' : ' is-empty'}`}
-              type="time"
-              value={draft.end}
-              onChange={(e) => set('end', e.target.value)}
-            />
-          </label>
+            <div className="time-field is-end">
+              <span className="lbl">
+                Fin <em>opcional</em>
+              </span>
+              <TimeSelect
+                label="Fin"
+                value={draft.end}
+                onChange={(v) => set('end', v)}
+                align="end"
+                shortcuts={endShortcuts}
+                clearLabel="Sin hora de fin"
+              />
+            </div>
+          </div>
+          {draft.start && (
+            <div className="quick-durations" role="group" aria-label="Duración rápida">
+              <span className="lbl">Duró</span>
+              {QUICK_DURATIONS.map((minutes) => {
+                const end = addMinutes(draft.start, minutes)!;
+                return (
+                  <button
+                    key={minutes}
+                    type="button"
+                    className="chip chip-sm"
+                    aria-pressed={draft.end === end}
+                    onClick={() => set('end', draft.end === end ? '' : end)}
+                  >
+                    {formatDuration(minutes)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <label className="activity-field">
           <span className="lbl">¿Qué hiciste?</span>
           <input
+            ref={activityRef}
             className="big-input"
             type="text"
             required

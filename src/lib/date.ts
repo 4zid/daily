@@ -123,3 +123,18 @@ export function formatHours(minutes: number): string {
   const hours = minutes / 60;
   return `${hours.toLocaleString(LOCALE, { maximumFractionDigits: 1 })} h`;
 }
+
+/** Suma minutos a "HH:MM" dando la vuelta a las 24 h. */
+export function addMinutes(time: string, minutes: number): string | undefined {
+  const base = timeToMinutes(time);
+  if (base === null) return undefined;
+  const total = (((base + minutes) % 1440) + 1440) % 1440;
+  return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
+}
+
+/** Hora actual redondeada hacia abajo al múltiplo de `step` minutos. */
+export function nowRounded(step = 5): string {
+  const d = new Date();
+  const m = Math.floor((d.getHours() * 60 + d.getMinutes()) / step) * step;
+  return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+}

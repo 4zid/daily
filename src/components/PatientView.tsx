@@ -117,7 +117,6 @@ function DayPanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const entries = useMemo(() => withDurations(day?.entries ?? []), [day?.entries]);
   const editing = day?.entries.find((e) => e.id === editingId) ?? null;
-  const last = day?.entries[day.entries.length - 1];
   const totalMinutes = entries.reduce((sum, e) => sum + (e.minutes ?? 0), 0);
   const dayPleasure = average(entries.map((e) => e.pleasure));
   const dayControl = average(entries.map((e) => e.control));
@@ -134,7 +133,13 @@ function DayPanel({
         </div>
       </div>
 
-      <EntryForm date={date} editing={editing} suggestedStart={last?.end ?? ''} onDone={() => setEditingId(null)} />
+      <EntryForm
+        date={date}
+        editing={editing}
+        entries={day?.entries ?? []}
+        isToday={date === todayISO()}
+        onDone={() => setEditingId(null)}
+      />
 
       <section className="card list-card" aria-labelledby="activities-title">
         <header className="card-head">
