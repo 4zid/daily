@@ -68,6 +68,7 @@ export function EntryForm({
   // Mientras no se toque el inicio, sigue la sugerencia (fin de la última actividad).
   const [startTouched, setStartTouched] = useState(false);
   const activityRef = useRef<HTMLInputElement>(null);
+  const chipsRef = useRef<HTMLDivElement>(null);
   const lastEnd = entries.at(-1)?.end ?? '';
 
   useEffect(() => {
@@ -79,6 +80,14 @@ export function EntryForm({
   useEffect(() => {
     if (!editing && !startTouched) setDraft((d) => ({ ...d, start: lastEnd }));
   }, [lastEnd, editing, startTouched]);
+
+  // En el celular las categorías se desplazan: deja visible la elegida.
+  useEffect(() => {
+    const el = chipsRef.current?.querySelector<HTMLElement>('[aria-checked="true"]');
+    if (el && chipsRef.current && chipsRef.current.scrollWidth > chipsRef.current.clientWidth) {
+      chipsRef.current.scrollLeft = el.offsetLeft - 18;
+    }
+  }, [draft.category, date]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }));
   const setStart = (value: string) => {
@@ -129,9 +138,6 @@ export function EntryForm({
               <span className="lbl">Inicio</span>
               <TimeSelect label="Inicio" value={draft.start} onChange={setStart} shortcuts={startShortcuts} />
             </div>
-            <span className="duration-pill" aria-live="polite">
-              {durationLabel(draft.start, draft.end)}
-            </span>
             <div className="time-field is-end">
               <span className="lbl">
                 Fin <em>opcional</em>
@@ -165,6 +171,9 @@ export function EntryForm({
               })}
             </div>
           )}
+          <span className="duration-pill" aria-live="polite">
+            {durationLabel(draft.start, draft.end)}
+          </span>
         </div>
 
         <label className="activity-field">
@@ -181,7 +190,7 @@ export function EntryForm({
           />
         </label>
 
-        <div className="chip-scroll" role="radiogroup" aria-label="Categoría">
+        <div className="chip-scroll" role="radiogroup" aria-label="Categoría" ref={chipsRef}>
           {CATEGORIES.map((c) => (
             <button
               key={c.id}

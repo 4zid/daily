@@ -3,14 +3,14 @@ import type { DayLog } from '../types';
 import { categoryColorVar, getCategory, MOODS, SCALES } from '../lib/categories';
 import { formatHours, longDate, weekdayShort } from '../lib/date';
 import type { WeekStats } from '../lib/stats';
+import { MoodIcon } from './common';
 
 function fmt(n: number): string {
   return n.toLocaleString('es-AR', { maximumFractionDigits: 1 });
 }
 
 function moodText(mood: number): string {
-  const m = MOODS[Math.min(4, Math.max(0, Math.round(mood) - 1))];
-  return `${m.emoji} ${m.label}`;
+  return MOODS[Math.min(4, Math.max(0, Math.round(mood) - 1))].label;
 }
 
 /**
@@ -45,6 +45,7 @@ export function RatingsChart({ data, moods }: { data: WeekStats['ratingsByDay'];
             <div
               key={d.date}
               className={`rc-day${hover === i ? ' is-hover' : ''}`}
+              role="img"
               tabIndex={0}
               onMouseEnter={() => setHover(i)}
               onFocus={() => setHover(i)}
@@ -90,12 +91,13 @@ export function RatingsChart({ data, moods }: { data: WeekStats['ratingsByDay'];
           return (
             <span key={d.date}>
               {weekdayShort(d.date)}
-              <small>{mood ? MOODS[Math.round(mood) - 1].emoji : ''}</small>
+              <small title={mood ? moodText(mood) : undefined}>{mood ? <MoodIcon value={mood} /> : null}</small>
             </span>
           );
         })}
       </div>
-      <table className="sr-only">
+      <div className="sr-only">
+        <table>
         <caption>Placer y control por día</caption>
         <thead>
           <tr>
@@ -115,7 +117,8 @@ export function RatingsChart({ data, moods }: { data: WeekStats['ratingsByDay'];
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
 }
@@ -164,7 +167,7 @@ export function CategoryBars({ data, totalMinutes }: { data: WeekStats['minutesB
             <span className="hbar-track">
               <span
                 className="hbar-fill"
-                style={{ width: `${Math.max((d.minutes / max) * 100, 3)}%`, background: categoryColorVar(d.id) }}
+                style={{ width: `${Math.max((d.minutes / max) * 100, 3)}%` }}
               />
             </span>
             <span className="hbar-value">{d.minutes ? formatHours(d.minutes) : `${d.count} act.`}</span>

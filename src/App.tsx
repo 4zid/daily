@@ -50,7 +50,11 @@ export default function App() {
   const clearToast = useCallback(() => setToast(null), []);
 
   useEffect(() => {
-    const onHash = () => setRoute(parseHash());
+    // Solo las rutas "#/…" cambian de vista; otros fragmentos no.
+    const onHash = () => {
+      if (window.location.hash && !window.location.hash.startsWith('#/')) return;
+      setRoute(parseHash());
+    };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -277,8 +281,8 @@ export default function App() {
             </button>
           </div>
         )}
-        {fileInput}
       </aside>
+      {fileInput}
 
       <main className="main">
         {view === 'paciente' ? (
@@ -302,6 +306,7 @@ export default function App() {
             onNote={onNote}
             onWeekStep={stepWeek}
             onBackToLocal={backToLocal}
+            onOpenFile={() => fileRef.current?.click()}
           />
         )}
       </main>

@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import {
+  Annoyed,
   Briefcase,
   Check,
+  Frown,
+  Laugh,
+  Meh,
+  Smile,
   Dumbbell,
   HeartPulse,
   House,
@@ -30,6 +35,14 @@ const CATEGORY_ICONS: Record<CategoryId, LucideIcon> = {
 
 export function CategoryIcon({ id }: { id: CategoryId }) {
   const Icon = CATEGORY_ICONS[id] ?? Shapes;
+  return <Icon aria-hidden />;
+}
+
+const MOOD_ICONS: Record<Mood, LucideIcon> = { 1: Frown, 2: Annoyed, 3: Meh, 4: Smile, 5: Laugh };
+
+/** Ánimo como ícono de línea, en el mismo lenguaje que el resto de la interfaz. */
+export function MoodIcon({ value }: { value: number }) {
+  const Icon = MOOD_ICONS[Math.min(5, Math.max(1, Math.round(value))) as Mood];
   return <Icon aria-hidden />;
 }
 
@@ -92,7 +105,7 @@ export function MoodPicker({
           aria-label={m.label}
           onClick={() => onChange(value === m.value ? undefined : m.value)}
         >
-          <span aria-hidden>{m.emoji}</span>
+          <MoodIcon value={m.value} />
         </button>
       ))}
     </div>
@@ -216,43 +229,82 @@ export function Menu({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const selectable = items.some((item) => item.selected !== undefined);
+
+  function close(focusTrigger: boolean) {
+    setOpen(false);
+    if (focusTrigger) triggerRef.current?.focus();
+  }
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (!ref.current?.contains(e.target as Node)) close(false);
     };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     document.addEventListener('pointerdown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('pointerdown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
+    // Foco en el ítem elegido o en el primero.
+    const options = menuRef.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]');
+    (menuRef.current?.querySelector<HTMLElement>('[aria-checked="true"]') ?? options?.[0])?.focus();
+    return () => document.removeEventListener('pointerdown', onDown);
   }, [open]);
+
+  function onMenuKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close(true);
+      return;
+    }
+    if (e.key === 'Tab') {
+      close(false);
+      return;
+    }
+    const options = [...e.currentTarget.querySelectorAll<HTMLElement>('[role^="menuitem"]')];
+    const index = options.indexOf(document.activeElement as HTMLElement);
+    const next =
+      e.key === 'ArrowDown' ? (index + 1) % options.length
+      : e.key === 'ArrowUp' ? (index - 1 + options.length) % options.length
+      : e.key === 'Home' ? 0
+      : e.key === 'End' ? options.length - 1
+      : null;
+    if (next === null) return;
+    e.preventDefault();
+    options[next]?.focus();
+  }
 
   return (
     <div className="menu-wrap" ref={ref}>
       <button
+        ref={triggerRef}
         type="button"
         className={triggerClassName}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? close(false) : setOpen(true))}
       >
         {trigger}
       </button>
       {open && (
-        <div className={`menu menu-${align} menu-${placement}`} role="menu" aria-label={label}>
+        <div
+          ref={menuRef}
+          className={`menu menu-${align} menu-${placement}`}
+          role="menu"
+          aria-label={label}
+          onKeyDown={onMenuKeyDown}
+        >
           {items.map((item) => (
             <button
               key={item.label}
               type="button"
-              role="menuitem"
+              role={selectable ? 'menuitemradio' : 'menuitem'}
+              aria-checked={selectable ? Boolean(item.selected) : undefined}
+              tabIndex={-1}
               className={`menu-item${item.selected ? ' is-selected' : ''}${item.danger ? ' is-danger' : ''}`}
               onClick={() => {
-                setOpen(false);
+                close(true);
                 item.onSelect();
               }}
             >

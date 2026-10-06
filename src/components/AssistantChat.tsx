@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, Check, LifeBuoy, Mic, Plus, Sparkles, X } from 'lucide-react';
+import { ArrowUp, Check, LifeBuoy, Mic, PenLine, Plus, Sparkles, X } from 'lucide-react';
 import type { DayLog } from '../types';
 import { getCategory, moodInfo } from '../lib/categories';
 import { longDate, parseISODate, weekdayLong, weekdayShort } from '../lib/date';
 import { organizeDay, type ChatTurn, type OrganizeResult } from '../lib/organize';
 import { actions, newId } from '../lib/store';
-import { CategoryAvatar, Menu, RoundCheck } from './common';
+import { CategoryAvatar, Menu, MoodIcon, RoundCheck } from './common';
 
 export type ChatMessage =
   | { id: string; role: 'user'; text: string }
@@ -390,7 +390,7 @@ function Proposal({
                     onChange={(e) => onUpdate({ applyMood: e.target.checked })}
                   />
                   <span className="avatar avatar-plain" aria-hidden>
-                    {mood.emoji}
+                    <MoodIcon value={mood.value} />
                   </span>
                   <span className="what">
                     <span className="what-title">Ánimo del día</span>
@@ -409,7 +409,7 @@ function Proposal({
                     onChange={(e) => onUpdate({ applyReflection: e.target.checked })}
                   />
                   <span className="avatar avatar-plain" aria-hidden>
-                    ✍️
+                    <PenLine />
                   </span>
                   <span className="what">
                     <span className="what-title">Reflexión</span>

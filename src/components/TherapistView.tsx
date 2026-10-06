@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, NotebookPen, Printer } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, ChevronLeft, ChevronRight, FileUp, NotebookPen, Printer } from 'lucide-react';
 import type { CategoryId, PatientDataset } from '../types';
 import { CATEGORIES, MOODS, SCALES, getCategory, moodInfo, type ScaleKey } from '../lib/categories';
 import {
@@ -11,7 +11,7 @@ import {
   weekdayShort,
 } from '../lib/date';
 import { weekStats, withDurations, type RatedEntry } from '../lib/stats';
-import { CategoryAvatar, CategoryPill, Menu, Scores } from './common';
+import { CategoryAvatar, CategoryPill, Menu, MoodIcon, Scores } from './common';
 import { CategoryBars, DaySegments, RatingsChart } from './Charts';
 
 export type DataSource = 'local' | 'link' | 'file';
@@ -28,6 +28,7 @@ export function TherapistView({
   onNote,
   onWeekStep,
   onBackToLocal,
+  onOpenFile,
 }: {
   dataset: PatientDataset;
   source: DataSource;
@@ -36,6 +37,7 @@ export function TherapistView({
   onNote: (note: string) => void;
   onWeekStep: (step: number) => void;
   onBackToLocal: () => void;
+  onOpenFile: () => void;
 }) {
   const stats = useMemo(() => weekStats(dataset.days, week), [dataset.days, week]);
   const [filter, setFilter] = useState<CategoryId | 'todas'>('todas');
@@ -82,6 +84,9 @@ export function TherapistView({
               <ChevronRight />
             </button>
           </div>
+          <button type="button" className="circle-btn only-compact" aria-label="Abrir archivo del paciente" onClick={onOpenFile}>
+            <FileUp />
+          </button>
           <button type="button" className="btn btn-primary" onClick={() => window.print()}>
             <Printer aria-hidden />
             Imprimir / PDF
@@ -94,15 +99,20 @@ export function TherapistView({
           <svg className="hero-art" viewBox="0 0 400 300" aria-hidden preserveAspectRatio="xMaxYMin slice">
             <circle cx="120" cy="40" r="120" />
             <circle cx="300" cy="300" r="190" />
-            <circle cx="345" cy="232" r="18" />
+            <circle cx="345" cy="150" r="18" />
             <circle className="fill" cx="250" cy="30" r="2.5" />
             <circle className="fill" cx="30" cy="110" r="2.5" />
           </svg>
           <div className="hero-top">
             <span className="pill-outline">Resumen</span>
-            <a className="circle-btn on-color" href="#registro-semana" aria-label="Ir al registro de la semana">
+            <button
+              type="button"
+              className="circle-btn on-color"
+              aria-label="Ir al registro de la semana"
+              onClick={() => document.getElementById('registro-semana')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            >
               <ArrowUpRight />
-            </a>
+            </button>
           </div>
           {stats.avgPleasure || stats.avgControl ? (
             <div className="hero-text">
@@ -161,10 +171,17 @@ export function TherapistView({
                 Imprimir
                 <Printer aria-hidden />
               </button>
-              <a className="btn btn-sm" href="#notas-sesion">
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => {
+                  document.getElementById('notas-sesion')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  document.getElementById('session-notes')?.focus({ preventScroll: true });
+                }}
+              >
                 Notas
                 <NotebookPen aria-hidden />
-              </a>
+              </button>
             </div>
           </div>
         </section>
@@ -286,7 +303,7 @@ function WeekLog({
               <h4>{longDate(date)}</h4>
               {mood && (
                 <span className="pill-tag">
-                  {mood.emoji} Día: {mood.label}
+                  <MoodIcon value={day.mood!} /> Día: {mood.label.toLowerCase()}
                 </span>
               )}
               <span className="sub">
@@ -302,6 +319,10 @@ function WeekLog({
                       <div className="item-main">
                         <p className="item-title">{e.activity}</p>
                         <p className="item-sub">
+                          <span className="item-time-inline tabular">
+                            {e.start}
+                            {e.end ? ` – ${e.end}` : ''} ·{' '}
+                          </span>
                           <span className="item-cat-inline">{getCategory(e.category).label}</span>
                           {e.notes && (
                             <span className="item-notes">

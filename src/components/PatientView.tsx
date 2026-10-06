@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Ellipsis, NotebookPen, Send, Sparkles } from 'lucide-react';
 import type { DayLog, Entry } from '../types';
-import { getCategory, moodInfo } from '../lib/categories';
+import { getCategory } from '../lib/categories';
 import {
   formatDuration,
   isoWeekNumber,
@@ -14,7 +14,7 @@ import {
 } from '../lib/date';
 import { actions } from '../lib/store';
 import { average, withDurations } from '../lib/stats';
-import { CategoryAvatar, Menu, MoodPicker, Scores } from './common';
+import { CategoryAvatar, Menu, MoodIcon, MoodPicker, Scores } from './common';
 import { EntryForm } from './EntryForm';
 
 export function PatientView({
@@ -79,7 +79,6 @@ export function PatientView({
         {dates.map((date) => {
           const day = days[date];
           const count = day?.entries.length ?? 0;
-          const mood = moodInfo(day?.mood);
           return (
             <button
               key={date}
@@ -92,7 +91,7 @@ export function PatientView({
               <span className="day-tile-name">{weekdayShort(date)}</span>
               <span className="day-tile-num">{parseISODate(date).getDate()}</span>
               <span className="day-tile-meta">
-                {mood && <span aria-hidden>{mood.emoji}</span>}
+                {day?.mood && <MoodIcon value={day.mood} />}
                 {count > 0 ? <span>{count}</span> : <span className="day-tile-empty" aria-hidden />}
               </span>
             </button>
