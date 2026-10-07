@@ -64,6 +64,10 @@ async function callApi(req: OrganizeRequest): Promise<OrganizedDay> {
     throw new ApiUnavailable('Sin conexión con el servidor.');
   }
   const body = (await res.json().catch(() => null)) as (OrganizedDay & { error?: string; message?: string }) | null;
+  // El plan gratis de la IA tiene un cupo por día: hasta mañana, modo básico.
+  if (body?.error === 'quota_exhausted') {
+    throw new ApiUnavailable('Por hoy se terminó el cupo gratis de la IA.');
+  }
   if (res.status === 404 || res.status === 503 || body?.error === 'not_configured') {
     throw new ApiUnavailable('La IA no está configurada en este servidor.');
   }

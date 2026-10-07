@@ -21,18 +21,28 @@ const ATTEMPT_TIMEOUT_MS = 45_000;
 
 // El plan gratis de Groq permite unos 8000 tokens por minuto por modelo, y cada pedido
 // descuenta lo que se manda más el máximo de respuesta. Las instrucciones y el esquema
-// ocupan ~1300 tokens; el resto del pedido (relato, guardadas e historial) se recorta a
-// USER_CONTENT_BUDGET caracteres (~3500 tokens) para que todo entre con margen.
-const MAX_COMPLETION_TOKENS = 2500;
-const USER_CONTENT_BUDGET = 12_000;
+// ocupan ~1300 tokens; el resto se estima en 3 caracteres por token (de más, para tener
+// margen). La respuesta se lleva lo que queda, entre MIN y MAX_COMPLETION_TOKENS.
+const TOKENS_PER_MINUTE = 7600;
+const FIXED_PROMPT_TOKENS = 1300;
+const CHARS_PER_TOKEN = 3;
+const MIN_COMPLETION_TOKENS = 1500;
+const MAX_COMPLETION_TOKENS = 4000;
+const charsFor = (tokens: number) => (TOKENS_PER_MINUTE - FIXED_PROMPT_TOKENS - tokens) * CHARS_PER_TOKEN;
+// El historial se agrega mientras deje lugar para una respuesta de 3000 tokens (~9900 caracteres
+// entre relato, guardadas e historial). La última propuesta entra aunque deje menos.
+const USER_CONTENT_BUDGET = charsFor(3000);
+const USER_CONTENT_LIMIT = charsFor(MIN_COMPLETION_TOKENS);
 // Actividades guardadas que se le pasan (las del día, para que no las repita).
 const MAX_SAVED = 40;
 
 function aiConfig() {
   const custom = process.env.AI_MODEL?.split(',').map((m) => m.trim()).filter(Boolean);
+  const baseUrl = process.env.AI_BASE_URL;
   return {
-    baseUrl: (process.env.AI_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, ''),
-    apiKey: process.env.AI_API_KEY || process.env.GROQ_API_KEY || '',
+    baseUrl: (baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, ''),
+    // Con otro proveedor, solo su clave: la de Groq nunca se manda a otro servidor.
+    apiKey: (baseUrl ? process.env.AI_API_KEY : process.env.AI_API_KEY || process.env.GROQ_API_KEY) ?? '',
     models: custom?.length ? custom : DEFAULT_MODELS,
   };
 }
@@ -130,7 +140,24 @@ function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-function buildMessages(req: OrganizeRequest, withHistory: boolean): ChatMessage[] {
+// Va en lugar de un mensaje que no entró, para que la conversación empiece con la persona.
+const OMITTED_TURN: ChatMessage = { role: 'user', content: '(Mensaje anterior omitido por largo.)' };
+
+const userChars = (messages: ChatMessage[]) =>
+  messages.reduce((n, m) => n + (m.role === 'system' ? 0 : m.content.length), 0);
+
+/** Lo que queda del límite por minuto para la respuesta. */
+function completionTokens(messages: ChatMessage[]): number {
+  const room = TOKENS_PER_MINUTE - FIXED_PROMPT_TOKENS - Math.ceil(userChars(messages) / CHARS_PER_TOKEN);
+  return Math.min(MAX_COMPLETION_TOKENS, Math.max(MIN_COMPLETION_TOKENS, room));
+}
+
+/**
+ * Arma la conversación. Con "full", suma los turnos más recientes que entren. Con
+ * "minimal" (si el pedido no entró), solo la última propuesta: es la que tiene lo que
+ * falta guardar, y sin ella una corrección pierde la lista.
+ */
+function buildMessages(req: OrganizeRequest, mode: 'full' | 'minimal'): ChatMessage[] {
   const saved = req.existing.length
     ? req.existing
         .slice(0, MAX_SAVED)
@@ -139,16 +166,28 @@ function buildMessages(req: OrganizeRequest, withHistory: boolean): ChatMessage[
     : '(ninguna)';
   const current = `Día: ${req.dateLabel} (${req.date})\nActividades ya guardadas ese día:\n${saved}\n\nMensaje:\n${req.message}`;
 
-  // Del más reciente al más viejo, mientras entren en el presupuesto.
+  const turns = req.history.slice(-MAX_HISTORY_TURNS);
   const history: ChatMessage[] = [];
-  let room = USER_CONTENT_BUDGET - current.length;
-  for (const turn of withHistory ? req.history.slice(-MAX_HISTORY_TURNS).reverse() : []) {
-    room -= turn.content.length;
-    if (room < 0) break;
-    history.unshift({ role: turn.role, content: turn.content });
+  if (mode === 'full') {
+    // Del más reciente al más viejo, mientras entren en el presupuesto.
+    let room = USER_CONTENT_BUDGET - current.length;
+    for (let i = turns.length - 1; i >= 0; i--) {
+      room -= turns[i].content.length;
+      if (room < 0) break;
+      history.unshift({ role: turns[i].role, content: turns[i].content });
+    }
+  }
+  const proposal = turns.findLast((t) => t.role === 'assistant');
+  if (
+    proposal &&
+    !history.some((t) => t.role === 'assistant') &&
+    proposal.content.length + OMITTED_TURN.content.length + current.length <= USER_CONTENT_LIMIT
+  ) {
+    history.length = 0;
+    history.push({ role: 'assistant', content: proposal.content });
   }
   // La conversación tiene que empezar con un mensaje de la persona.
-  while (history.length && history[0].role !== 'user') history.shift();
+  if (history[0]?.role === 'assistant') history.unshift(OMITTED_TURN);
 
   return [{ role: 'system', content: SYSTEM_PROMPT }, ...history, { role: 'user', content: current }];
 }
@@ -165,6 +204,9 @@ type Failure = {
 /** Resultado de un intento con un modelo. */
 type Attempt = { ok: true; day: z.infer<typeof OrganizedDaySchema> } | Failure;
 
+const TOO_MUCH =
+  'Es mucho para ordenar de una sola vez. Contámelo en partes (por ejemplo, la mañana y después la tarde) y guardá cada parte antes de seguir.';
+
 const FAILURES = {
   auth: { status: 500, error: 'auth', message: 'La clave de la API de la IA no es válida.' },
   rateLimited: { status: 429, error: 'rate_limited', message: 'Hay muchos pedidos en este momento. Probá en un minuto.' },
@@ -172,25 +214,28 @@ const FAILURES = {
   api: { status: 502, error: 'api', message: 'La IA devolvió un error. Probá de nuevo en un momento.' },
   parse: { status: 502, error: 'parse_error', message: 'No pude ordenar este relato. Probá de nuevo o cargalo a mano.' },
   refusal: { status: 422, error: 'refusal', message: 'No pude procesar este relato. Probá cargándolo a mano.' },
-  tooLarge: {
-    status: 413,
-    error: 'too_large',
-    message: 'El relato es muy largo para la IA. Probá contarlo en partes más cortas.',
-  },
+  // El pedido no entra en el límite por minuto.
+  tooLarge: { status: 413, error: 'too_large', message: TOO_MUCH },
+  // La respuesta no entró en el máximo: con otro modelo pasaría lo mismo.
+  tooLong: { status: 422, error: 'too_long', message: TOO_MUCH },
+  // Se terminó el cupo gratis del día: la app sigue con el modo básico.
+  quotaExhausted: { status: 503, error: 'quota_exhausted', message: 'Por hoy se terminó el cupo gratis de la IA.' },
 } as const;
 
 const fail = (kind: keyof typeof FAILURES, retry: boolean): Failure => ({ ok: false, kind, retry, ...FAILURES[kind] });
 
-/** Código de error de la API (sin el texto: puede incluir lo que escribió la persona). */
-function errorInfo(detail: string): { code: string; tooLarge: boolean } {
+/** Código de error de la API (sin el texto, que puede incluir lo que escribió la persona). */
+function errorInfo(detail: string): { code: string; tooLarge: boolean; daily: boolean } {
   try {
     const error = (JSON.parse(detail) as { error?: { code?: unknown; message?: unknown } }).error;
+    const message = String(error?.message ?? '');
     return {
       code: String(error?.code ?? '').slice(0, 60),
-      tooLarge: /request too large|reduce your message size/i.test(String(error?.message ?? '')),
+      tooLarge: /request too large|reduce your message size/i.test(message),
+      daily: /per day|\b(TPD|RPD)\b/i.test(message),
     };
   } catch {
-    return { code: '', tooLarge: false };
+    return { code: '', tooLarge: false, daily: false };
   }
 }
 
@@ -212,7 +257,7 @@ async function attempt(
           json_schema: { name: 'dia_ordenado', strict: true, schema: RESPONSE_SCHEMA },
         },
         temperature: 0.3,
-        max_completion_tokens: MAX_COMPLETION_TOKENS,
+        max_completion_tokens: completionTokens(messages),
         // Los modelos gpt-oss razonan antes de responder: con poco alcanza y gasta menos cupo.
         ...(/gpt-oss/.test(model) ? { reasoning_effort: 'low' } : {}),
       }),
@@ -223,13 +268,16 @@ async function attempt(
   }
 
   if (!res.ok) {
-    const { code, tooLarge } = errorInfo(await res.text().catch(() => ''));
+    const { code, tooLarge, daily } = errorInfo(await res.text().catch(() => ''));
     console.error('IA: error de la API', model, res.status, code);
     if (res.status === 401 || res.status === 403) return fail('auth', false);
     // Un pedido más grande que el límite por minuto: no entra en ningún modelo del plan.
     if (res.status === 413 || tooLarge) return fail('tooLarge', false);
-    // Sin cupo en este modelo: cada modelo tiene el suyo.
-    if (res.status === 429) return fail('rateLimited', true);
+    // Sin cupo en este modelo: cada modelo tiene el suyo. Si es el del día, no sirve esperar un minuto.
+    if (res.status === 429) {
+      const wait = Number(res.headers.get('retry-after'));
+      return fail(daily || wait > 120 ? 'quotaExhausted' : 'rateLimited', true);
+    }
     // La salida no respetó el esquema, o el modelo ya no existe: se prueba el siguiente.
     if (/json_validate_failed|model_not_found|model_decommissioned/.test(code)) return fail('parse', true);
     return fail('api', res.status >= 500 || res.status === 404);
@@ -240,8 +288,12 @@ async function attempt(
   } | null;
   const choice = body?.choices?.[0];
   if (choice?.message?.refusal) return fail('refusal', false);
-  if (!choice?.message?.content || choice.finish_reason === 'length') {
-    console.error('IA: respuesta incompleta', model, choice?.finish_reason);
+  if (choice?.finish_reason === 'length') {
+    console.error('IA: respuesta cortada', model);
+    return fail('tooLong', false);
+  }
+  if (!choice?.message?.content) {
+    console.error('IA: respuesta vacía', model, choice?.finish_reason);
     return fail('parse', true);
   }
   let raw: unknown;
@@ -275,16 +327,18 @@ export async function POST(request: Request): Promise<Response> {
     return json({ error: 'bad_request', message: 'El pedido no tiene el formato esperado.' }, 400);
   }
 
-  const full = buildMessages(parsedBody.data, true);
+  const full = buildMessages(parsedBody.data, 'full');
+  const minimal = buildMessages(parsedBody.data, 'minimal');
   let failure: Failure = fail('api', false);
   for (const model of config.models) {
     let result = await attempt(config, model, full);
-    // Si no entra, se prueba una vez sin la conversación previa.
-    if (!result.ok && result.kind === 'tooLarge' && full.length > 2) {
-      result = await attempt(config, model, buildMessages(parsedBody.data, false));
+    // Si no entra, se prueba una vez con menos conversación previa.
+    if (!result.ok && result.kind === 'tooLarge' && userChars(minimal) < userChars(full)) {
+      result = await attempt(config, model, minimal);
     }
     if (result.ok) return json(result.day);
-    failure = result;
+    // Si un modelo solo está sin cupo por este minuto, eso es lo que se avisa.
+    if (!(result.kind === 'quotaExhausted' && failure.kind === 'rateLimited')) failure = result;
     if (!result.retry) break;
   }
   return json({ error: failure.error, message: failure.message }, failure.status);

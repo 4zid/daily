@@ -76,7 +76,7 @@ Sin configurar nada, el chat funciona en **modo básico**: reconoce horarios ("a
 
 La clave queda del lado del servidor: nunca llega al navegador. La función solo responde a usuarios con sesión iniciada, así que nadie de afuera puede gastar tu cupo. Por defecto usa `openai/gpt-oss-120b`, y si ese modelo llega a su límite gratis pasa a `openai/gpt-oss-20b` (cada modelo tiene su propio cupo).
 
-**Cuánto alcanza el plan gratis.** Groq limita por modelo y por minuto (unos 8000 tokens) y por día (unos 200.000 tokens). Para entrar en el límite por minuto, la función manda solo la parte más reciente de la conversación. En la práctica rinde unos 30 a 50 mensajes por día por modelo, o sea entre 60 y 100 con los dos. Los números exactos de tu cuenta están en **Settings → Limits** de la consola de Groq.
+**Cuánto alcanza el plan gratis.** Groq limita por modelo y por minuto (unos 8000 tokens) y por día (unos 200.000 tokens). Para entrar en el límite por minuto, la función manda solo la parte más reciente de la conversación. En la práctica rinde unos 30 a 50 mensajes por día por modelo, o sea entre 60 y 100 con los dos. Cuando se termina el cupo del día, el chat sigue en modo básico y lo avisa. Si alguien cuenta un día muy largo de una sola vez, la app le pide que lo cuente en partes. Los números exactos de tu cuenta están en **Settings → Limits** de la consola de Groq.
 
 **Privacidad en Groq.** Groq no usa lo que se le manda para entrenar modelos. Igual conviene:
 
@@ -87,9 +87,11 @@ La clave queda del lado del servidor: nunca llega al navegador. La función solo
 
 ```bash
 AI_BASE_URL=https://api.otro-proveedor.com/v1   # por defecto, Groq
-AI_API_KEY=tu-clave                             # si está, se usa en vez de GROQ_API_KEY
+AI_API_KEY=tu-clave                             # obligatoria con AI_BASE_URL; sin ella se usa GROQ_API_KEY
 AI_MODEL=modelo-principal,modelo-de-respaldo    # se prueban en orden
 ```
+
+Con `AI_BASE_URL` la clave de Groq nunca se manda a ese otro servidor: hace falta `AI_API_KEY`.
 
 ## Publicarlo (Vercel)
 
