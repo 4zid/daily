@@ -74,7 +74,14 @@ Sin configurar nada, el chat funciona en **modo básico**: reconoce horarios ("a
 
 3. Reiniciá `npm run dev`.
 
-La clave queda del lado del servidor: nunca llega al navegador. La función solo responde a usuarios con sesión iniciada, así que nadie de afuera puede gastar tu cupo. Por defecto usa `openai/gpt-oss-120b`, y si ese modelo llega a su límite gratis del día pasa a `openai/gpt-oss-20b` (cada modelo tiene su propio cupo).
+La clave queda del lado del servidor: nunca llega al navegador. La función solo responde a usuarios con sesión iniciada, así que nadie de afuera puede gastar tu cupo. Por defecto usa `openai/gpt-oss-120b`, y si ese modelo llega a su límite gratis pasa a `openai/gpt-oss-20b` (cada modelo tiene su propio cupo).
+
+**Cuánto alcanza el plan gratis.** Groq limita por modelo y por minuto (unos 8000 tokens) y por día (unos 200.000 tokens). Para entrar en el límite por minuto, la función manda solo la parte más reciente de la conversación. En la práctica rinde unos 30 a 50 mensajes por día por modelo, o sea entre 60 y 100 con los dos. Los números exactos de tu cuenta están en **Settings → Limits** de la consola de Groq.
+
+**Privacidad en Groq.** Groq no usa lo que se le manda para entrenar modelos. Igual conviene:
+
+- Activar **Zero Data Retention** en **Settings → Data Controls**, si aparece en tu cuenta, para que tampoco guarde registros temporales.
+- No usar la opción de feedback de la consola con textos de pacientes: eso sí lo revisan personas.
 
 **Otro proveedor.** La función habla con cualquier API compatible con OpenAI que admita salida con esquema JSON (`response_format: json_schema`). Para cambiar de proveedor o de modelo:
 

@@ -19,6 +19,15 @@ const DEFAULT_MODELS = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
 // Tiempo máximo por intento, para que un modelo lento no deje colgado el chat.
 const ATTEMPT_TIMEOUT_MS = 45_000;
 
+// El plan gratis de Groq permite unos 8000 tokens por minuto por modelo, y cada pedido
+// descuenta lo que se manda más el máximo de respuesta. Las instrucciones y el esquema
+// ocupan ~1300 tokens; el resto del pedido (relato, guardadas e historial) se recorta a
+// USER_CONTENT_BUDGET caracteres (~3500 tokens) para que todo entre con margen.
+const MAX_COMPLETION_TOKENS = 2500;
+const USER_CONTENT_BUDGET = 12_000;
+// Actividades guardadas que se le pasan (las del día, para que no las repita).
+const MAX_SAVED = 40;
+
 function aiConfig() {
   const custom = process.env.AI_MODEL?.split(',').map((m) => m.trim()).filter(Boolean);
   return {
@@ -95,7 +104,7 @@ const OrganizedDaySchema = z.object({
 // y sin propiedades extra.
 const { $schema: _draft, ...RESPONSE_SCHEMA } = z.toJSONSchema(OrganizedDaySchema, { target: 'draft-7' });
 
-// Turnos de conversación previos que se mandan a la IA (los más recientes).
+// Turnos de conversación previos que se mandan a la IA (los más recientes que entren).
 const MAX_HISTORY_TURNS = 30;
 
 const RequestSchema = z.object({
@@ -121,27 +130,38 @@ function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-function buildMessages(req: OrganizeRequest): ChatMessage[] {
-  const messages: ChatMessage[] = [];
-  for (const turn of req.history.slice(-MAX_HISTORY_TURNS)) {
-    // La conversación tiene que empezar con un mensaje de la persona.
-    if (messages.length === 0 && turn.role !== 'user') continue;
-    messages.push({ role: turn.role, content: turn.content });
-  }
-
+function buildMessages(req: OrganizeRequest, withHistory: boolean): ChatMessage[] {
   const saved = req.existing.length
-    ? req.existing.map((e) => `- ${e.start}${e.end ? `–${e.end}` : ''} ${e.activity}`).join('\n')
+    ? req.existing
+        .slice(0, MAX_SAVED)
+        .map((e) => `- ${e.start}${e.end ? `–${e.end}` : ''} ${e.activity.slice(0, 80)}`)
+        .join('\n')
     : '(ninguna)';
+  const current = `Día: ${req.dateLabel} (${req.date})\nActividades ya guardadas ese día:\n${saved}\n\nMensaje:\n${req.message}`;
 
-  messages.push({
-    role: 'user',
-    content: `Día: ${req.dateLabel} (${req.date})\nActividades ya guardadas ese día:\n${saved}\n\nMensaje:\n${req.message}`,
-  });
-  return [{ role: 'system', content: SYSTEM_PROMPT }, ...messages];
+  // Del más reciente al más viejo, mientras entren en el presupuesto.
+  const history: ChatMessage[] = [];
+  let room = USER_CONTENT_BUDGET - current.length;
+  for (const turn of withHistory ? req.history.slice(-MAX_HISTORY_TURNS).reverse() : []) {
+    room -= turn.content.length;
+    if (room < 0) break;
+    history.unshift({ role: turn.role, content: turn.content });
+  }
+  // La conversación tiene que empezar con un mensaje de la persona.
+  while (history.length && history[0].role !== 'user') history.shift();
+
+  return [{ role: 'system', content: SYSTEM_PROMPT }, ...history, { role: 'user', content: current }];
 }
 
 // retry: vale la pena probar con el modelo siguiente.
-type Failure = { ok: false; retry: boolean; status: number; error: string; message: string };
+type Failure = {
+  ok: false;
+  kind: keyof typeof FAILURES;
+  retry: boolean;
+  status: number;
+  error: string;
+  message: string;
+};
 /** Resultado de un intento con un modelo. */
 type Attempt = { ok: true; day: z.infer<typeof OrganizedDaySchema> } | Failure;
 
@@ -152,9 +172,27 @@ const FAILURES = {
   api: { status: 502, error: 'api', message: 'La IA devolvió un error. Probá de nuevo en un momento.' },
   parse: { status: 502, error: 'parse_error', message: 'No pude ordenar este relato. Probá de nuevo o cargalo a mano.' },
   refusal: { status: 422, error: 'refusal', message: 'No pude procesar este relato. Probá cargándolo a mano.' },
+  tooLarge: {
+    status: 413,
+    error: 'too_large',
+    message: 'El relato es muy largo para la IA. Probá contarlo en partes más cortas.',
+  },
 } as const;
 
-const fail = (kind: keyof typeof FAILURES, retry: boolean): Failure => ({ ok: false, retry, ...FAILURES[kind] });
+const fail = (kind: keyof typeof FAILURES, retry: boolean): Failure => ({ ok: false, kind, retry, ...FAILURES[kind] });
+
+/** Código de error de la API (sin el texto: puede incluir lo que escribió la persona). */
+function errorInfo(detail: string): { code: string; tooLarge: boolean } {
+  try {
+    const error = (JSON.parse(detail) as { error?: { code?: unknown; message?: unknown } }).error;
+    return {
+      code: String(error?.code ?? '').slice(0, 60),
+      tooLarge: /request too large|reduce your message size/i.test(String(error?.message ?? '')),
+    };
+  } catch {
+    return { code: '', tooLarge: false };
+  }
+}
 
 async function attempt(
   config: ReturnType<typeof aiConfig>,
@@ -174,7 +212,9 @@ async function attempt(
           json_schema: { name: 'dia_ordenado', strict: true, schema: RESPONSE_SCHEMA },
         },
         temperature: 0.3,
-        max_completion_tokens: 8000,
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
+        // Los modelos gpt-oss razonan antes de responder: con poco alcanza y gasta menos cupo.
+        ...(/gpt-oss/.test(model) ? { reasoning_effort: 'low' } : {}),
       }),
       signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
     });
@@ -183,12 +223,15 @@ async function attempt(
   }
 
   if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    console.error('IA: error de la API', model, res.status, detail.slice(0, 300));
+    const { code, tooLarge } = errorInfo(await res.text().catch(() => ''));
+    console.error('IA: error de la API', model, res.status, code);
     if (res.status === 401 || res.status === 403) return fail('auth', false);
+    // Un pedido más grande que el límite por minuto: no entra en ningún modelo del plan.
+    if (res.status === 413 || tooLarge) return fail('tooLarge', false);
+    // Sin cupo en este modelo: cada modelo tiene el suyo.
     if (res.status === 429) return fail('rateLimited', true);
-    // 400 con la salida que no respetó el esquema: otro modelo puede hacerlo bien.
-    if (res.status === 400 && /json_validate_failed|schema/i.test(detail)) return fail('parse', true);
+    // La salida no respetó el esquema, o el modelo ya no existe: se prueba el siguiente.
+    if (/json_validate_failed|model_not_found|model_decommissioned/.test(code)) return fail('parse', true);
     return fail('api', res.status >= 500 || res.status === 404);
   }
 
@@ -232,10 +275,14 @@ export async function POST(request: Request): Promise<Response> {
     return json({ error: 'bad_request', message: 'El pedido no tiene el formato esperado.' }, 400);
   }
 
-  const messages = buildMessages(parsedBody.data);
+  const full = buildMessages(parsedBody.data, true);
   let failure: Failure = fail('api', false);
   for (const model of config.models) {
-    const result = await attempt(config, model, messages);
+    let result = await attempt(config, model, full);
+    // Si no entra, se prueba una vez sin la conversación previa.
+    if (!result.ok && result.kind === 'tooLarge' && full.length > 2) {
+      result = await attempt(config, model, buildMessages(parsedBody.data, false));
+    }
     if (result.ok) return json(result.day);
     failure = result;
     if (!result.retry) break;
