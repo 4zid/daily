@@ -141,9 +141,12 @@ export function parseBackup(text: string): { patientName: string; days: Record<s
 // ─────────── Presentación (onboarding) ───────────
 
 const ONBOARDING_KEY = 'daily.presentacion.v1';
+// Respaldo para cuando el navegador no deja guardar: vale mientras la página siga abierta.
+let seenInMemory = false;
 
 /** Si en este navegador ya se vio la presentación. */
 export function hasSeenOnboarding(): boolean {
+  if (seenInMemory) return true;
   try {
     return localStorage.getItem(ONBOARDING_KEY) === '1';
   } catch {
@@ -152,6 +155,7 @@ export function hasSeenOnboarding(): boolean {
 }
 
 export function markOnboardingSeen() {
+  seenInMemory = true;
   try {
     localStorage.setItem(ONBOARDING_KEY, '1');
   } catch {

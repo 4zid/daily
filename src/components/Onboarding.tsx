@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import type { CategoryId } from '../types';
 import { CATEGORIES, categoryColorVar } from '../lib/categories';
-import { navigate } from '../lib/route';
+import { navigate, useHashPath } from '../lib/route';
 import { markOnboardingSeen } from '../lib/store';
 import { Brand, CategoryAvatar, RoundCheck, Scores } from './common';
 
@@ -122,32 +122,55 @@ function prefersReducedMotion() {
 }
 
 export function Onboarding({ signedIn = false }: { signedIn?: boolean }) {
+  const path = useHashPath();
   const [step, setStep] = useState(0);
   // La animación larga de entrada se ve una sola vez, al abrir.
   const [intro, setIntro] = useState(true);
   const sceneRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const swipe = useRef<{ x: number; y: number } | null>(null);
+  // El paso de destino, para que varios clics o teclas seguidos se sumen bien.
+  const stepRef = useRef(0);
+  const transition = useRef<ViewTransition | null>(null);
   const current = STEPS[step];
 
-  const go = useCallback(
-    (next: number) => {
-      if (next === step || next < 0 || next > LAST) return;
-      const update = () => {
-        setStep(next);
-        setIntro(false);
-      };
-      const root = document.documentElement;
-      root.dataset.obDir = next > step ? 'next' : 'prev';
-      if (next === LAST) markOnboardingSeen();
-      // Transición entre pasos donde el navegador la soporta; si no, el paso nuevo entra animado igual.
-      if (document.startViewTransition && !prefersReducedMotion()) {
-        document.startViewTransition(() => flushSync(update));
-      } else {
-        update();
-      }
-    },
-    [step],
-  );
+  // La presentación tiene su ruta: así "atrás" desde la demo o el ingreso vuelve acá.
+  useEffect(() => {
+    if (path !== 'bienvenida') navigate('bienvenida', true);
+  }, [path]);
+
+  const go = useCallback((next: number) => {
+    const from = stepRef.current;
+    if (next === from || next < 0 || next > LAST) return;
+    stepRef.current = next;
+    const update = () => {
+      setStep(next);
+      setIntro(false);
+    };
+    document.documentElement.dataset.obDir = next > from ? 'next' : 'prev';
+    if (next === LAST) markOnboardingSeen();
+    // Si había una transición en curso, se completa ya y arranca la nueva.
+    transition.current?.skipTransition();
+    // Transición entre pasos donde el navegador la soporta; si no, el paso nuevo entra animado igual.
+    if (document.startViewTransition && !prefersReducedMotion()) {
+      const vt = document.startViewTransition(() => flushSync(update));
+      transition.current = vt;
+      void vt.finished.finally(() => {
+        if (transition.current === vt) transition.current = null;
+      });
+    } else {
+      update();
+    }
+  }, []);
+
+  // Si el botón que tenía el foco desaparece o se deshabilita, el foco pasa al título.
+  useEffect(() => {
+    if (intro) return;
+    const active = document.activeElement as HTMLButtonElement | null;
+    if (!active || active === document.body || active.disabled || !active.isConnected) {
+      titleRef.current?.focus({ preventScroll: true });
+    }
+  }, [step, intro]);
 
   // Flechas del teclado para avanzar y volver.
   useEffect(() => {
@@ -155,20 +178,20 @@ export function Onboarding({ signedIn = false }: { signedIn?: boolean }) {
       if (e.altKey || e.ctrlKey || e.metaKey) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest('input, textarea, [role="menu"]')) return;
-      if (e.key === 'ArrowRight') go(step + 1);
-      if (e.key === 'ArrowLeft') go(step - 1);
+      if (e.key === 'ArrowRight') go(stepRef.current + 1);
+      if (e.key === 'ArrowLeft') go(stepRef.current - 1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [go, step]);
+  }, [go]);
 
   // La ilustración tiene un tamaño fijo y se escala para entrar en el escenario.
+  // Se mide sin transformaciones (la entrada anima la escala del escenario).
   useLayoutEffect(() => {
     const el = sceneRef.current;
     if (!el) return;
     const fit = () => {
-      const { width, height } = el.getBoundingClientRect();
-      const scale = Math.min(width / 600, height / 600, 1.15);
+      const scale = Math.min(el.clientWidth / 600, el.clientHeight / 600, 1.15);
       el.style.setProperty('--scene-scale', String(Math.max(0.3, scale)));
     };
     fit();
@@ -189,7 +212,7 @@ export function Onboarding({ signedIn = false }: { signedIn?: boolean }) {
     if (!start) return;
     const dx = e.clientX - start.x;
     const dy = e.clientY - start.y;
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(step + (dx < 0 ? 1 : -1));
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(stepRef.current + (dx < 0 ? 1 : -1));
   }
 
   function finish(path: string) {
@@ -236,11 +259,14 @@ export function Onboarding({ signedIn = false }: { signedIn?: boolean }) {
       </section>
 
       <main className="ob-panel">
-        <div className="ob-copy" key={current.id} aria-live="polite">
+        <p className="sr-only" aria-live="polite">
+          Paso {step + 1} de {STEPS.length}: {current.kicker}
+        </p>
+        <div className="ob-copy" key={current.id}>
           <p className="kicker ob-in" style={delay(intro ? 520 : 60)}>
             Paso {step + 1} de {STEPS.length} · <b>{current.kicker}</b>
           </p>
-          <h1 className="ob-title ob-in" style={delay(intro ? 620 : 120)}>
+          <h1 className="ob-title ob-in" style={delay(intro ? 620 : 120)} ref={titleRef} tabIndex={-1}>
             {current.title}
           </h1>
           <p className="ob-text ob-in" style={delay(intro ? 760 : 200)}>
@@ -268,14 +294,14 @@ export function Onboarding({ signedIn = false }: { signedIn?: boolean }) {
             <button
               type="button"
               className="circle-btn"
-              onClick={() => go(step - 1)}
+              onClick={() => go(stepRef.current - 1)}
               aria-label="Paso anterior"
-              disabled={step === 0}
+              aria-disabled={step === 0}
             >
               <ChevronLeft />
             </button>
             {!isLast && (
-              <button type="button" className="btn btn-primary ob-next" onClick={() => go(step + 1)}>
+              <button type="button" className="btn btn-primary ob-next" onClick={() => go(stepRef.current + 1)}>
                 {step === 0 ? 'Empezar' : 'Siguiente'}
                 <ArrowRight aria-hidden />
               </button>

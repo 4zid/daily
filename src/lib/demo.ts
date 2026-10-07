@@ -80,7 +80,7 @@ const WEEKDAY: Block[] = [
     start: '13:00',
     end: '14:00',
     options: [
-      ['Almuerzo con compañeras', 'vinculos', 7, 6],
+      ['Almuerzo con compañeros de trabajo', 'vinculos', 7, 6],
       ['Almuerzo en el escritorio', 'comidas', 4, 5],
     ],
   },
@@ -148,7 +148,7 @@ const WEEKEND: Block[] = [
     chance: 0.5,
     options: [
       ['Bici por la costanera', 'movimiento', 9, 8],
-      ['Paseo con amigas', 'vinculos', 8, 6],
+      ['Paseo con amigos', 'vinculos', 8, 6],
     ],
   },
   {
@@ -169,7 +169,7 @@ const REFLECTIONS = [
   'Día tranquilo. Sentí que tenía bastante control de lo que tenía que hacer.',
   'La reunión me dejó pensando: me cuesta decir que no.',
   'Disfruté mucho el almuerzo con mi familia, hacía rato que no nos juntábamos.',
-  'Terminé lo que tenía pendiente y me sentí orgullosa.',
+  'Terminé lo que tenía pendiente y me sentí bien conmigo.',
   'Me quedé hasta tarde con el celular y al otro día lo sentí.',
 ];
 
@@ -197,6 +197,8 @@ interface PatientPlan {
   weeksBack: number;
   /** Probabilidad de puntuar cada actividad. */
   rated: number;
+  /** Día de la sesión de terapia (0 = lunes), a las 18:30. */
+  therapyDay: number;
 }
 
 function generatePatient(db: DemoDb, p: PatientPlan, today: string, nowMinutes: number) {
@@ -209,8 +211,9 @@ function generatePatient(db: DemoDb, p: PatientPlan, today: string, nowMinutes: 
 
   for (let date = first; date <= today; date = addDays(date, 1)) {
     const isToday = date === today;
-    if (!isToday && rand() < p.skip) continue;
     const weekday = (new Date(`${date}T12:00:00`).getDay() + 6) % 7;
+    // El día de terapia siempre queda registrado.
+    if (!isToday && weekday !== p.therapyDay && rand() < p.skip) continue;
     const weekend = weekday >= 5;
     const hard = hardDays.has(date);
     const blocks = weekend ? WEEKEND : WEEKDAY;
@@ -218,10 +221,10 @@ function generatePatient(db: DemoDb, p: PatientPlan, today: string, nowMinutes: 
     let count = 0;
 
     blocks.forEach((block, index) => {
-      if (block.chance !== undefined && rand() > block.chance) return;
-      let [activity, category, pleasure, control, note] = pick(block.options);
-      // Los jueves, terapia en vez de la actividad de la tarde.
-      if (weekday === 3 && index === 5) [activity, category, pleasure, control, note] = THERAPY;
+      // El día de terapia, la sesión reemplaza a la actividad de la tarde.
+      const therapy = !weekend && weekday === p.therapyDay && index === 5;
+      if (!therapy && block.chance !== undefined && rand() > block.chance) return;
+      let [activity, category, pleasure, control, note] = therapy ? THERAPY : pick(block.options);
       const jitter = weekend || index === 0 ? Math.round((rand() - 0.5) * 2) * 15 : 0;
       const start = shift(block.start, jitter);
       const end = shift(block.end, jitter);
@@ -290,9 +293,12 @@ function createDb(): DemoDb {
       },
     ],
   };
-  generatePatient(db, { id: DEMO_PATIENT.id, seed: 20261, skip: 0.08, weeksBack: 3, rated: 0.95 }, today, nowMinutes);
-  generatePatient(db, { id: 'demo-tomas', seed: 9137, skip: 0.45, weeksBack: 2, rated: 0.7 }, today, nowMinutes);
-  generatePatient(db, { id: 'demo-camila', seed: 5521, skip: 0.3, weeksBack: 1, rated: 0.85 }, today, nowMinutes);
+  const plans: PatientPlan[] = [
+    { id: DEMO_PATIENT.id, seed: 20261, skip: 0.08, weeksBack: 3, rated: 0.95, therapyDay: 3 },
+    { id: 'demo-tomas', seed: 9137, skip: 0.45, weeksBack: 2, rated: 0.7, therapyDay: 1 },
+    { id: 'demo-camila', seed: 5521, skip: 0.3, weeksBack: 1, rated: 0.85, therapyDay: 0 },
+  ];
+  for (const plan of plans) generatePatient(db, plan, today, nowMinutes);
   db.notes.set(
     `${DEMO_PATIENT.id}|${addDays(weekStart(today), -7)}`,
     'Buena semana en general. Registró que caminar después del trabajo le sube el ánimo.\nRetomar: la reunión del miércoles y qué le pasa cuando tiene que decir que no.',
@@ -316,8 +322,9 @@ function strip<T extends { patient_id: string }>(row: T): Omit<T, 'patient_id'> 
   return rest;
 }
 
-function rowsOf(patientId: string, from = '0000-00-00', to = '9999-99-99'): Rows {
-  const d = data();
+// Cada operación toma la base al empezar: si en la pausa se reinicia la demo,
+// lo pendiente cae en la base vieja (que se descarta) y no en la nueva.
+function rowsOf(d: DemoDb, patientId: string, from = '0000-00-00', to = '9999-99-99'): Rows {
   return {
     entries: d.entries.filter((e) => e.patient_id === patientId && e.date >= from && e.date <= to).map(strip),
     days: d.days.filter((x) => x.patient_id === patientId && x.date >= from && x.date <= to).map(strip),
@@ -328,70 +335,81 @@ const demoBackend: Backend = {
   kind: 'demo',
 
   async weekRows(patientId, from, to) {
+    const rows = structuredClone(rowsOf(data(), patientId, from, to));
     await tick();
-    return structuredClone(rowsOf(patientId, from, to));
+    return rows;
   },
 
   async weekList(patientId) {
+    const { entries, days } = rowsOf(data(), patientId);
     await tick();
     const counts = new Map<string, number>();
-    const { entries, days } = rowsOf(patientId);
     for (const e of entries) counts.set(weekStart(e.date), (counts.get(weekStart(e.date)) ?? 0) + 1);
     for (const d of days) if (d.mood || d.reflection) counts.set(weekStart(d.date), counts.get(weekStart(d.date)) ?? 0);
     return [...counts].map(([week, n]) => ({ week, entries: n })).sort((a, b) => b.week.localeCompare(a.week));
   },
 
   async insertEntries(rows: NewEntryRow[]) {
+    const d = data();
     await tick();
-    data().entries.push(...structuredClone(rows));
+    d.entries.push(...structuredClone(rows));
   },
 
   async updateEntry(id, row) {
+    const d = data();
     await tick();
-    const entry = data().entries.find((e) => e.id === id);
+    const entry = d.entries.find((e) => e.id === id);
     if (entry) Object.assign(entry, structuredClone(row));
   },
 
   async deleteEntry(id) {
+    const d = data();
     await tick();
-    data().entries = data().entries.filter((e) => e.id !== id);
+    d.entries = d.entries.filter((e) => e.id !== id);
   },
 
   async upsertDays(rows) {
+    const d = data();
     await tick();
     for (const row of rows) {
-      const existing = data().days.find((d) => d.patient_id === row.patient_id && d.date === row.date);
+      const existing = d.days.find((x) => x.patient_id === row.patient_id && x.date === row.date);
       if (existing) Object.assign(existing, row);
-      else data().days.push({ ...row });
+      else d.days.push({ ...row });
     }
   },
 
   async getNote(patientId, week) {
+    const note = data().notes.get(`${patientId}|${week}`) ?? '';
     await tick();
-    return data().notes.get(`${patientId}|${week}`) ?? '';
+    return note;
   },
 
   async saveNote(patientId, week, note) {
+    const d = data();
     await tick();
-    data().notes.set(`${patientId}|${week}`, note);
+    d.notes.set(`${patientId}|${week}`, note);
   },
 
   async patients() {
+    const list = data().patients.map((p) => ({ ...p }));
     await tick();
-    return data().patients.map((p) => ({ ...p }));
+    return list;
   },
 
   async therapistOf(patientId) {
+    const linked = data().patients.some((p) => p.id === patientId);
     await tick();
-    return data().patients.some((p) => p.id === patientId) ? DEMO_THERAPIST.full_name : null;
+    return linked ? DEMO_THERAPIST.full_name : null;
   },
 
   async invitations() {
+    const list = data().invitations.map((i) => ({ ...i }));
     await tick();
-    return data().invitations.map((i) => ({ ...i }));
+    return list;
   },
 
   async createInvitation(label) {
+    const d = data();
     await tick();
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const code = `DEMO${Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('')}`;
@@ -403,18 +421,19 @@ const demoBackend: Backend = {
       expires_at: new Date(now + 14 * 864e5).toISOString(),
       used_at: null,
     };
-    data().invitations.unshift(invitation);
+    d.invitations.unshift(invitation);
     return { ...invitation };
   },
 
   async deleteInvitation(code) {
+    const d = data();
     await tick();
-    data().invitations = data().invitations.filter((i) => i.code !== code);
+    d.invitations = d.invitations.filter((i) => i.code !== code);
   },
 
   async lookupInvitation(code) {
-    await tick();
     const found = data().invitations.find((i) => i.code === code);
+    await tick();
     return found ? { therapistName: DEMO_THERAPIST.full_name, valid: !found.used_at } : null;
   },
 
@@ -423,8 +442,9 @@ const demoBackend: Backend = {
   },
 
   async endCareLink(patientId) {
+    const d = data();
     await tick();
-    data().patients = data().patients.filter((p) => p.id !== patientId);
+    d.patients = d.patients.filter((p) => p.id !== patientId);
   },
 
   async deleteMyAccount() {
@@ -432,10 +452,21 @@ const demoBackend: Backend = {
   },
 
   async allRows(patientId) {
+    const rows = structuredClone(rowsOf(data(), patientId));
     await tick();
-    return structuredClone(rowsOf(patientId));
+    return rows;
   },
 };
+
+/**
+ * Semana con la que abre el informe del terapeuta: la actual, salvo que tenga
+ * poco cargado todavía (por ejemplo, un lunes temprano); ahí, la anterior.
+ */
+export function demoReportWeek(): string {
+  const monday = weekStart(todayISO());
+  const count = data().entries.filter((e) => e.patient_id === DEMO_PATIENT.id && weekStart(e.date) === monday).length;
+  return count >= 8 ? monday : addDays(monday, -7);
+}
 
 // ─────────── Entrar y salir ───────────
 

@@ -33,20 +33,25 @@ export function TherapistApp({
   path,
   onNavigate = navigate,
   demo,
+  initialWeek,
 }: {
   profile: Profile;
   path: string;
   /** Cambia de ruta (en la demo, las rutas llevan el prefijo de la demo). */
   onNavigate?: (path: string, replace?: boolean) => void;
   demo?: DemoControls;
+  /** Semana con la que abre cada paciente (por defecto, la actual). */
+  initialWeek?: string;
 }) {
   const thisWeek = weekStart(todayISO());
   const inviteCode = inviteCodeFrom(path);
 
   const [patients, setPatients] = useState<PatientSummary[] | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(readSelected);
-  const [week, setWeek] = useState(thisWeek);
+  // En la demo no se recuerda el paciente elegido: no pisa el de la cuenta real.
+  const [selectedId, setSelectedId] = useState<string | null>(() => (demo ? null : readSelected()));
+  const startWeek = initialWeek ?? thisWeek;
+  const [week, setWeek] = useState(startWeek);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -97,7 +102,8 @@ export function TherapistApp({
 
   function selectPatient(id: string) {
     setSelectedId(id);
-    setWeek(thisWeek);
+    setWeek(startWeek);
+    if (demo) return;
     try {
       sessionStorage.setItem(SELECTED_KEY, id);
     } catch {

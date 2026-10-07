@@ -219,9 +219,12 @@ function persist(
   errorMessage = SAVE_ERROR,
 ) {
   const patient = currentPatient;
+  // Si mientras tanto se cambió de origen de datos (por ejemplo, se salió de la
+  // demo), lo pendiente ya no corresponde: ni se refresca ni se deshace.
+  const gen = generation;
   task.then(
-    () => patient && void fetchWeekList(patient),
-    () => rollback(date, snap, errorMessage),
+    () => gen === generation && patient && void fetchWeekList(patient),
+    () => gen === generation && rollback(date, snap, errorMessage),
   );
 }
 

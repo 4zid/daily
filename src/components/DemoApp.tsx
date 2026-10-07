@@ -1,6 +1,6 @@
 import { useCallback, useId, useLayoutEffect, useState } from 'react';
 import { RotateCcw, Stethoscope, UserRound, X } from 'lucide-react';
-import { DEMO_PATIENT, DEMO_THERAPIST, enterDemo, exitDemo, resetDemo } from '../lib/demo';
+import { DEMO_PATIENT, DEMO_THERAPIST, demoReportWeek, enterDemo, exitDemo, resetDemo } from '../lib/demo';
 import { navigate } from '../lib/route';
 import { markOnboardingSeen } from '../lib/store';
 import type { DemoControls } from './Dialogs';
@@ -81,6 +81,7 @@ export function DemoApp({ path, signedIn }: { path: string; signedIn: boolean })
           path="informe"
           onNavigate={onNavigate}
           demo={controls}
+          initialWeek={demoReportWeek()}
         />
       )}
     </div>
@@ -115,7 +116,7 @@ function DemoDock({
           onClick={() => onHint(!hint)}
         >
           <span className="live-dot" aria-hidden />
-          Demo
+          <span className="demo-badge-text">Demo</span>
         </button>
         <div className="segmented demo-roles" role="group" aria-label="Ver como">
           <button

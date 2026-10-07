@@ -4418,9 +4418,10 @@ dialog.modal::backdrop {
 
 .ob-foot {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px 16px;
   max-width: 520px;
 }
 
@@ -4468,6 +4469,7 @@ dialog.modal::backdrop {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 
 .ob-nav .circle-btn {
@@ -4475,9 +4477,30 @@ dialog.modal::backdrop {
   height: 52px;
 }
 
-.ob-nav .circle-btn:disabled {
+.ob-nav .circle-btn[aria-disabled='true'] {
   opacity: 0.35;
   cursor: default;
+}
+
+/* El título recibe el foco al cambiar de paso (para lectores de pantalla), sin anillo. */
+.ob-title:focus {
+  outline: none;
+}
+
+/* Durante la transición entre pasos los clics llegan a la página. */
+::view-transition {
+  pointer-events: none;
+}
+
+@media (forced-colors: active) {
+  .ob-dot span {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  .ob-dot[aria-current='step'] span {
+    background: Highlight;
+  }
 }
 
 .ob-next {
@@ -4524,7 +4547,7 @@ dialog.modal::backdrop {
 
 .ob-roles {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 8px;
 }
 
@@ -4599,7 +4622,7 @@ dialog.modal::backdrop {
 
 /* Cambio de paso: lo anterior sale hacia el costado y lo nuevo entra con sus animaciones. */
 ::view-transition-old(ob-scene) {
-  animation: ob-vt-out 0.32s cubic-bezier(0.4, 0, 1, 1) both;
+  animation: ob-vt-out 0.26s cubic-bezier(0.4, 0, 1, 1) both;
 }
 
 ::view-transition-new(ob-scene),
@@ -4643,13 +4666,33 @@ dialog.modal::backdrop {
 .demo-dock-wrap {
   position: fixed;
   top: 14px;
-  left: 50%;
+  /* Centrado sobre la columna principal (a la izquierda está la barra lateral). */
+  left: calc(50vw + (var(--sidebar-w) + var(--gap)) / 2);
   z-index: 30;
   display: grid;
   justify-items: center;
   gap: 8px;
+  width: max-content;
   translate: -50% 0;
   pointer-events: none;
+}
+
+@media (min-width: 1321px) {
+  /* En el registro del paciente, a la derecha está la columna del chat. */
+  .demo-root:has(.app[data-view='registro']) .demo-dock-wrap {
+    left: calc(50vw + (var(--sidebar-w) - var(--assistant-w)) / 2);
+  }
+}
+
+@media (min-width: 901px) {
+  /* Al ir a un elemento (Editar, Ir al registro), que no quede bajo la barra de la demo. */
+  :root:has(.demo-root) {
+    scroll-padding-top: 80px;
+  }
+
+  :root:has(.demo-root.has-hint) {
+    scroll-padding-top: 136px;
+  }
 }
 
 .demo-dock {
@@ -4730,6 +4773,7 @@ dialog.modal::backdrop {
 }
 
 .demo-cta {
+  white-space: nowrap;
   height: 36px;
   padding: 0 14px;
   border: 0;
@@ -4785,6 +4829,7 @@ dialog.modal::backdrop {
 }
 
 .demo-badge {
+  white-space: nowrap;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -4835,6 +4880,42 @@ dialog.modal::backdrop {
 }
 
 @media (max-width: 900px) {
+  .demo-dock-wrap {
+    position: relative;
+    top: auto;
+    left: auto;
+    z-index: 25;
+    grid-template-columns: minmax(0, 1fr);
+    width: auto;
+    padding: 10px 12px 0;
+    translate: none;
+  }
+
+  .demo-dock {
+    justify-content: space-between;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .demo-roles,
+  .demo-roles button {
+    min-width: 0;
+  }
+
+  .demo-hint {
+    max-width: none;
+    width: 100%;
+    animation: none;
+  }
+
+  .demo-root .main,
+  .demo-root.has-hint .main {
+    padding-top: 8px;
+  }
+}
+
+/* Presentación apilada: escenario arriba y texto abajo. */
+@media (max-width: 1000px) {
   .ob {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr;
@@ -4862,6 +4943,14 @@ dialog.modal::backdrop {
     padding: 20px 8px 8px;
   }
 
+  .ob-copy,
+  .ob-foot,
+  .ob-choices {
+    max-width: 640px;
+  }
+}
+
+@media (max-width: 900px) {
   .ob-title {
     font-size: 32px;
   }
@@ -4890,38 +4979,47 @@ dialog.modal::backdrop {
   .ob-next {
     padding: 0 18px 0 22px;
   }
+}
 
-  .demo-dock-wrap {
-    position: relative;
-    top: auto;
-    left: auto;
-    z-index: 25;
-    padding: 10px 12px 0;
-    translate: none;
+@media (max-width: 400px) {
+  .ob-dot {
+    width: 14px;
   }
 
-  .demo-dock {
-    justify-content: space-between;
-    width: 100%;
+  .ob-dot[aria-current='step'] {
+    width: 28px;
   }
 
-  .demo-hint {
-    max-width: none;
-    width: 100%;
-    animation: none;
+  .ob-next {
+    padding: 0 14px 0 18px;
   }
 
-  .demo-root .main,
-  .demo-root.has-hint .main {
-    padding-top: 8px;
+  /* La barra de la demo entra en 320 px: "Demo" queda como un punto. */
+  .demo-badge {
+    padding: 0 10px;
+  }
+
+  .demo-badge-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .demo-roles button {
+    padding: 0 9px;
+    font-size: 13px;
+  }
+
+  .demo-icon-btn {
+    width: 32px;
+    height: 32px;
   }
 }
 
 @media (max-width: 560px) {
-  .ob-roles {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .demo-roles button svg,
   .demo-cta {
     display: none;
@@ -5426,6 +5524,12 @@ dialog.modal::backdrop {
   .notice,
   .demo-dock-wrap {
     display: none !important;
+  }
+
+  .demo-root .main,
+  .demo-root.has-hint .main {
+    padding-top: 0;
+    transition: none;
   }
 
   .main {

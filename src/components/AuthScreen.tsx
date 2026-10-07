@@ -56,12 +56,12 @@ export function AuthScreen({
 }: {
   inviteCode: string | null;
   recovery: boolean;
-  /** Pantalla con la que abre ("#/crear-cuenta" abre el alta). */
+  /** Pantalla pedida por la ruta ("#/ingresar" o "#/crear-cuenta"); sin ruta, el ingreso. */
   initialMode?: 'login' | 'signup';
 }) {
   const auth = useAuth();
   const ids = useId();
-  const [mode, setMode] = useState<Mode>(inviteCode ? 'signup' : initialMode);
+  const [mode, setMode] = useState<Mode>(inviteCode ? 'signup' : (initialMode ?? 'login'));
   const [role, setRole] = useState<Role>(inviteCode ? 'patient' : 'therapist');
   const [code, setCode] = useState(inviteCode ?? '');
   const [fromLink, setFromLink] = useState(Boolean(inviteCode));
@@ -79,9 +79,9 @@ export function AuthScreen({
   useEffect(() => markOnboardingSeen(), []);
 
   // "#/ingresar" y "#/crear-cuenta" cambian de pantalla aunque ya esté abierta.
+  // Solo cuando la ruta pide una pantalla: así no pisa "Confirmá tu email" ni la recuperación.
   useEffect(() => {
-    if (!inviteCode) go(initialMode);
-    // Solo cuando cambia la ruta.
+    if (!inviteCode && initialMode) go(initialMode);
   }, [initialMode]);
 
   // Si se abre otro link de invitación con la pantalla abierta.
@@ -162,7 +162,7 @@ export function AuthScreen({
       void run(async () => {
         const { needsConfirmation } = await auth.signUpPatient({ name, email, password, code });
         // La invitación ya se usó: la URL deja de apuntar a ella.
-        navigate('registro', true);
+        if (inviteCode) navigate('registro', true);
         if (needsConfirmation) go('confirm');
       });
     }

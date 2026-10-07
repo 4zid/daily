@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useAuth } from './lib/auth';
 import { resetCloudCache } from './lib/cloud';
-import { inviteCodeFrom, useHashPath } from './lib/route';
-import { hasSeenOnboarding, useLocal } from './lib/store';
+import { inviteCodeFrom, navigate, useHashPath } from './lib/route';
+import { hasSeenOnboarding, markOnboardingSeen, useLocal } from './lib/store';
 import { AuthScreen } from './components/AuthScreen';
 import { DemoApp } from './components/DemoApp';
 import { Onboarding } from './components/Onboarding';
@@ -29,6 +29,16 @@ export default function App() {
     if (auth.status === 'signed-out') resetCloudCache();
   }, [auth.status]);
 
+  const signedIn = auth.status === 'signed-in';
+
+  // Quien ya tiene cuenta no necesita la presentación al cerrar sesión, y al entrar
+  // la ruta de ingreso o alta deja lugar a la de la app.
+  useEffect(() => {
+    if (!signedIn) return;
+    markOnboardingSeen();
+    if (path === 'ingresar' || path === 'crear-cuenta') navigate('', true);
+  }, [signedIn, path]);
+
   if (auth.status === 'loading') {
     return (
       <div className="splash" role="status" aria-label="Cargando">
@@ -36,8 +46,6 @@ export default function App() {
       </div>
     );
   }
-
-  const signedIn = auth.status === 'signed-in';
 
   // La demo y la presentación se pueden ver con o sin sesión (por ejemplo, para mostrarlas).
   if (path === 'demo' || path.startsWith('demo/')) return <DemoApp path={path} signedIn={signedIn} />;
@@ -51,7 +59,7 @@ export default function App() {
       <AuthScreen
         inviteCode={inviteCode}
         recovery={auth.status === 'recovery'}
-        initialMode={path === 'crear-cuenta' ? 'signup' : 'login'}
+        initialMode={path === 'crear-cuenta' ? 'signup' : path === 'ingresar' ? 'login' : undefined}
       />
     );
   }
