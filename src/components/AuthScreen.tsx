@@ -76,7 +76,9 @@ export function AuthScreen({
 
   // Quien llega al ingreso ya no necesita la presentación (por ejemplo, desde una
   // invitación): así, después de crear la cuenta, no aparece en lugar del aviso.
-  useEffect(() => markOnboardingSeen(), []);
+  useEffect(() => {
+    markOnboardingSeen();
+  }, []);
 
   // "#/ingresar" y "#/crear-cuenta" cambian de pantalla aunque ya esté abierta.
   // Solo cuando la ruta pide una pantalla: así no pisa "Confirmá tu email" ni la recuperación.

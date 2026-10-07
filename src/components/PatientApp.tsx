@@ -64,7 +64,11 @@ export function PatientApp({
   }, [profile.id, notify]);
 
   // Cada vista arranca desde arriba.
-  useEffect(() => window.scrollTo(0, 0), [view]);
+  // Con llaves: en Chrome nuevo scrollTo devuelve una promesa, y un efecto que
+  // devuelve algo que no es una función rompe la pantalla al cambiar de vista.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [view]);
 
   const weekState = useWeek(profile.id, week);
   const weekList = useWeekList(profile.id);
@@ -74,7 +78,9 @@ export function PatientApp({
       .then(setTherapist)
       .catch(() => setTherapist(undefined));
   }, [profile.id]);
-  useEffect(loadTherapist, [loadTherapist]);
+  useEffect(() => {
+    loadTherapist();
+  }, [loadTherapist]);
 
   // Link de invitación abierto con la sesión iniciada: vincularse (o cambiar) de terapeuta.
   useEffect(() => {

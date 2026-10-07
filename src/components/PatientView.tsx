@@ -257,7 +257,9 @@ function Reflection({ date, value }: { date: string; value: string }) {
   const [text, setText] = useState(value);
 
   // Si la IA agrega una reflexión, se refleja en el campo.
-  useEffect(() => setText(value), [value]);
+  useEffect(() => {
+    setText(value);
+  }, [value]);
 
   useEffect(() => {
     if (text === value) return;

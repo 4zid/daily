@@ -62,7 +62,9 @@ export function TherapistApp({
   const clearToast = useCallback(() => setToast(null), []);
 
   // El terapeuta solo lee: sin paciente activo, las acciones de escritura no hacen nada.
-  useEffect(() => configureCloud(null, notify), [notify]);
+  useEffect(() => {
+    configureCloud(null, notify);
+  }, [notify]);
 
   const loadPatients = useCallback(async () => {
     try {
