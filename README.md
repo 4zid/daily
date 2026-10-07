@@ -87,11 +87,11 @@ La clave queda del lado del servidor: nunca llega al navegador. La función solo
 
 ```bash
 AI_BASE_URL=https://api.otro-proveedor.com/v1   # por defecto, Groq
-AI_API_KEY=tu-clave                             # obligatoria con AI_BASE_URL; sin ella se usa GROQ_API_KEY
+AI_API_KEY=tu-clave                             # la del otro proveedor (con Groq alcanza GROQ_API_KEY)
 AI_MODEL=modelo-principal,modelo-de-respaldo    # se prueban en orden
 ```
 
-Con `AI_BASE_URL` la clave de Groq nunca se manda a ese otro servidor: hace falta `AI_API_KEY`.
+Si `AI_BASE_URL` apunta a otro proveedor, la clave de Groq no se le manda: hace falta `AI_API_KEY`.
 
 ## Publicarlo (Vercel)
 

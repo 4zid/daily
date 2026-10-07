@@ -45,13 +45,20 @@ const EXAMPLES = [
 
 function toHistory(messages: ChatMessage[]): ChatTurn[] {
   const turns: ChatTurn[] = [];
-  for (const m of messages) {
-    if (m.role === 'user') turns.push({ role: 'user', content: m.text });
+  messages.forEach((m, i) => {
+    // Un mensaje que falló no se manda: la persona lo vuelve a contar (por ejemplo, en partes).
+    if (m.role === 'user' && messages[i + 1]?.role !== 'error') turns.push({ role: 'user', content: m.text });
     if (m.role === 'assistant' && m.result.mode === 'ia') {
+      // Solo la propuesta pendiente va completa: lo guardado ya va entre las actividades
+      // guardadas, y lo descartado o reemplazado no hay que volver a proponerlo.
       const { reply, entries, dayMood, reflection, supportNote } = m.result;
-      turns.push({ role: 'assistant', content: JSON.stringify({ reply, entries, dayMood, reflection, supportNote }) });
+      const day =
+        m.status === 'pending'
+          ? { reply, entries, dayMood, reflection, supportNote }
+          : { reply, entries: [], dayMood: null, reflection: null, supportNote: null };
+      turns.push({ role: 'assistant', content: JSON.stringify(day) });
     }
-  }
+  });
   return turns.slice(-MAX_HISTORY_TURNS);
 }
 
@@ -125,8 +132,13 @@ export function AssistantChat({
         existing: (day?.entries ?? []).map((e) => ({ start: e.start, end: e.end, activity: e.activity })),
       });
       onMessages((prev) => [
-        // Una propuesta nueva reemplaza a las anteriores que no se guardaron.
-        ...prev.map((m) => (m.role === 'assistant' && m.status === 'pending' ? { ...m, status: 'replaced' as const } : m)),
+        // Una propuesta nueva reemplaza a las anteriores que no se guardaron. Una del modo
+        // básico no reemplaza a una de la IA (solo leyó el último mensaje, no la corrige).
+        ...prev.map((m) =>
+          m.role === 'assistant' && m.status === 'pending' && (result.mode === 'ia' || m.result.mode === 'basico')
+            ? { ...m, status: 'replaced' as const }
+            : m,
+        ),
         {
           id: newId(),
           role: 'assistant',

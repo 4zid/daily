@@ -33,16 +33,30 @@ const charsFor = (tokens: number) => (TOKENS_PER_MINUTE - FIXED_PROMPT_TOKENS - 
 // entre relato, guardadas e historial). La última propuesta entra aunque deje menos.
 const USER_CONTENT_BUDGET = charsFor(3000);
 const USER_CONTENT_LIMIT = charsFor(MIN_COMPLETION_TOKENS);
+// Para seguir con una propuesta pendiente, la IA la vuelve a escribir entera: tiene que
+// entrar en la respuesta (el JSON rinde ~3,5 caracteres por token) con lugar para razonar.
+const JSON_CHARS_PER_TOKEN = 3.5;
+const REASONING_TOKENS = 500;
 // Actividades guardadas que se le pasan (las del día, para que no las repita).
 const MAX_SAVED = 40;
 
+function isGroq(url: string): boolean {
+  try {
+    return new URL(url).hostname === 'api.groq.com';
+  } catch {
+    return false;
+  }
+}
+
 function aiConfig() {
   const custom = process.env.AI_MODEL?.split(',').map((m) => m.trim()).filter(Boolean);
-  const baseUrl = process.env.AI_BASE_URL;
+  const baseUrl = (process.env.AI_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, '');
+  // La clave de Groq solo se manda a Groq: con otro proveedor hace falta AI_API_KEY.
+  const groq = isGroq(baseUrl);
   return {
-    baseUrl: (baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, ''),
-    // Con otro proveedor, solo su clave: la de Groq nunca se manda a otro servidor.
-    apiKey: (baseUrl ? process.env.AI_API_KEY : process.env.AI_API_KEY || process.env.GROQ_API_KEY) ?? '',
+    baseUrl,
+    apiKey: process.env.AI_API_KEY || (groq ? process.env.GROQ_API_KEY : '') || '',
+    keyName: groq ? 'GROQ_API_KEY' : 'AI_API_KEY',
     models: custom?.length ? custom : DEFAULT_MODELS,
   };
 }
@@ -152,10 +166,22 @@ function completionTokens(messages: ChatMessage[]): number {
   return Math.min(MAX_COMPLETION_TOKENS, Math.max(MIN_COMPLETION_TOKENS, room));
 }
 
+/** La última propuesta de la IA, si todavía tiene actividades sin guardar. */
+function pendingProposal(req: OrganizeRequest): string | null {
+  const last = req.history.slice(-MAX_HISTORY_TURNS).findLast((t) => t.role === 'assistant');
+  if (!last) return null;
+  try {
+    const entries = (JSON.parse(last.content) as { entries?: unknown }).entries;
+    return Array.isArray(entries) && entries.length ? last.content : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Arma la conversación. Con "full", suma los turnos más recientes que entren. Con
- * "minimal" (si el pedido no entró), solo la última propuesta: es la que tiene lo que
- * falta guardar, y sin ella una corrección pierde la lista.
+ * Arma la conversación. Primero va la última propuesta, que tiene lo que falta guardar
+ * (sin ella, una corrección pierde la lista). Con "full" se suman después los turnos más
+ * recientes que entren; con "minimal" (si el pedido no entró), nada más.
  */
 function buildMessages(req: OrganizeRequest, mode: 'full' | 'minimal'): ChatMessage[] {
   const saved = req.existing.length
@@ -167,25 +193,28 @@ function buildMessages(req: OrganizeRequest, mode: 'full' | 'minimal'): ChatMess
   const current = `Día: ${req.dateLabel} (${req.date})\nActividades ya guardadas ese día:\n${saved}\n\nMensaje:\n${req.message}`;
 
   const turns = req.history.slice(-MAX_HISTORY_TURNS);
-  const history: ChatMessage[] = [];
-  if (mode === 'full') {
-    // Del más reciente al más viejo, mientras entren en el presupuesto.
-    let room = USER_CONTENT_BUDGET - current.length;
-    for (let i = turns.length - 1; i >= 0; i--) {
-      room -= turns[i].content.length;
-      if (room < 0) break;
-      history.unshift({ role: turns[i].role, content: turns[i].content });
+  const picked = new Set<number>();
+  let used = current.length;
+  const proposal = turns.findLastIndex((t) => t.role === 'assistant');
+  if (proposal >= 0) {
+    const size = OMITTED_TURN.content.length + turns[proposal].content.length;
+    if (used + size <= USER_CONTENT_LIMIT) {
+      picked.add(proposal);
+      used += size;
     }
   }
-  const proposal = turns.findLast((t) => t.role === 'assistant');
-  if (
-    proposal &&
-    !history.some((t) => t.role === 'assistant') &&
-    proposal.content.length + OMITTED_TURN.content.length + current.length <= USER_CONTENT_LIMIT
-  ) {
-    history.length = 0;
-    history.push({ role: 'assistant', content: proposal.content });
+  if (mode === 'full') {
+    // Del más reciente al más viejo, mientras entren en el presupuesto.
+    for (let i = turns.length - 1; i >= 0; i--) {
+      if (picked.has(i)) continue;
+      if (used + turns[i].content.length > USER_CONTENT_BUDGET) break;
+      picked.add(i);
+      used += turns[i].content.length;
+    }
   }
+  const history: ChatMessage[] = turns
+    .filter((_, i) => picked.has(i))
+    .map((t) => ({ role: t.role, content: t.content }));
   // La conversación tiene que empezar con un mensaje de la persona.
   if (history[0]?.role === 'assistant') history.unshift(OMITTED_TURN);
 
@@ -218,6 +247,13 @@ const FAILURES = {
   tooLarge: { status: 413, error: 'too_large', message: TOO_MUCH },
   // La respuesta no entró en el máximo: con otro modelo pasaría lo mismo.
   tooLong: { status: 422, error: 'too_long', message: TOO_MUCH },
+  // La propuesta pendiente es tan larga que no entra para volver a escribirla.
+  listTooLong: {
+    status: 422,
+    error: 'too_long',
+    message:
+      'La lista que te propuse es muy larga para seguir cambiándola con la IA. Destildá lo que esté mal, guardá el resto y después contame lo que falte.',
+  },
   // Se terminó el cupo gratis del día: la app sigue con el modo básico.
   quotaExhausted: { status: 503, error: 'quota_exhausted', message: 'Por hoy se terminó el cupo gratis de la IA.' },
 } as const;
@@ -314,7 +350,8 @@ async function attempt(
 export async function POST(request: Request): Promise<Response> {
   const config = aiConfig();
   if (!config.apiKey) {
-    return json({ error: 'not_configured', message: 'Falta configurar GROQ_API_KEY.' }, 503);
+    console.error(`IA: falta ${config.keyName}`);
+    return json({ error: 'not_configured', message: `Falta configurar ${config.keyName}.` }, 503);
   }
 
   // Solo usuarios con sesión iniciada: así nadie más usa tu clave.
@@ -329,6 +366,18 @@ export async function POST(request: Request): Promise<Response> {
 
   const full = buildMessages(parsedBody.data, 'full');
   const minimal = buildMessages(parsedBody.data, 'minimal');
+
+  // Con una propuesta pendiente muy larga, la respuesta no tendría lugar para reescribirla:
+  // se avisa sin gastar cupo en un pedido que va a quedar cortado.
+  const pending = pendingProposal(parsedBody.data);
+  if (
+    pending &&
+    (!full.some((m) => m.role === 'assistant' && m.content === pending) ||
+      completionTokens(full) < Math.ceil(pending.length / JSON_CHARS_PER_TOKEN) + REASONING_TOKENS)
+  ) {
+    const { status, error, message } = FAILURES.listTooLong;
+    return json({ error, message }, status);
+  }
   let failure: Failure = fail('api', false);
   for (const model of config.models) {
     let result = await attempt(config, model, full);
