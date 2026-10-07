@@ -2,11 +2,16 @@ import { useEffect } from 'react';
 import { useAuth } from './lib/auth';
 import { resetCloudCache } from './lib/cloud';
 import { inviteCodeFrom, useHashPath } from './lib/route';
-import { useLocal } from './lib/store';
+import { hasSeenOnboarding, useLocal } from './lib/store';
 import { AuthScreen } from './components/AuthScreen';
+import { DemoApp } from './components/DemoApp';
+import { Onboarding } from './components/Onboarding';
 import { PatientApp } from './components/PatientApp';
 import { TherapistApp } from './components/TherapistApp';
 import { Brand } from './components/common';
+
+// Rutas: "#/bienvenida" (presentación), "#/demo/…" (demo como invitado),
+// "#/ingresar", "#/crear-cuenta", "#/invitacion/CÓDIGO", y las de la app.
 
 export default function App() {
   const auth = useAuth();
@@ -32,8 +37,23 @@ export default function App() {
     );
   }
 
+  const signedIn = auth.status === 'signed-in';
+
+  // La demo y la presentación se pueden ver con o sin sesión (por ejemplo, para mostrarlas).
+  if (path === 'demo' || path.startsWith('demo/')) return <DemoApp path={path} signedIn={signedIn} />;
+  if (path === 'bienvenida' && auth.status !== 'recovery') return <Onboarding signedIn={signedIn} />;
+
   if (auth.status === 'signed-out' || auth.status === 'recovery') {
-    return <AuthScreen inviteCode={inviteCodeFrom(path)} recovery={auth.status === 'recovery'} />;
+    const inviteCode = inviteCodeFrom(path);
+    const explicit = path === 'ingresar' || path === 'crear-cuenta';
+    if (!inviteCode && !explicit && auth.status === 'signed-out' && !hasSeenOnboarding()) return <Onboarding />;
+    return (
+      <AuthScreen
+        inviteCode={inviteCode}
+        recovery={auth.status === 'recovery'}
+        initialMode={path === 'crear-cuenta' ? 'signup' : 'login'}
+      />
+    );
   }
 
   if (auth.status === 'no-profile' || !auth.profile) {

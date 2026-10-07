@@ -3,6 +3,7 @@ import { isCategoryId, isMood, isRating } from './categories';
 import { normalizeTime } from './date';
 import { organizeBasic } from './basicParser';
 import { accessToken } from './auth';
+import { isDemoBackend } from './cloud';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -80,6 +81,14 @@ async function callApi(req: OrganizeRequest): Promise<OrganizedDay> {
  * (o la app corre sin backend), usa el modo básico local.
  */
 export async function organizeDay(req: OrganizeRequest): Promise<OrganizeResult> {
+  // En la demo sin cuenta no se llama a la IA (necesita una sesión): se usa el modo básico.
+  if (isDemoBackend() && !(await accessToken())) {
+    return {
+      ...organizeBasic(req.message),
+      mode: 'basico',
+      notice: 'En la demo, el chat usa el modo básico (sin IA). Con una cuenta, lo ordena la IA y entiende mucho más.',
+    };
+  }
   try {
     const result = await callApi(req);
     return { ...sanitize(result), mode: 'ia' };

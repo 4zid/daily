@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react';
-import { Copy, Download, LogOut, MessageCircle, Send, Share2, Trash2 } from 'lucide-react';
+import { Copy, Download, LogOut, MessageCircle, RotateCcw, Send, Share2, Trash2 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import {
   createInvitation,
@@ -11,7 +11,7 @@ import {
   type Invitation,
 } from '../lib/cloud';
 import { buildBackup, local, useLocal } from '../lib/store';
-import { authErrorMessage } from '../lib/supabase';
+import { authErrorMessage, type Profile } from '../lib/supabase';
 import { Modal, copyText, downloadJson } from './common';
 
 const THEMES = [
@@ -20,25 +20,80 @@ const THEMES = [
   ['dark', 'Oscuro'],
 ] as const;
 
-export function SettingsDialog({
-  open,
-  therapistName,
-  onEndLink,
-  onClose,
-  onToast,
-}: {
+/** Acciones de la demo que se ofrecen en los ajustes y en la barra de la demo. */
+export interface DemoControls {
+  onReset: () => void;
+  onExit: () => void;
+  exitLabel: string;
+}
+
+interface SettingsProps {
   open: boolean;
+  profile: Profile;
+  /** En la demo no hay cuenta: solo tema, reiniciar y salir. */
+  demo?: DemoControls;
   /** Paciente: nombre del terapeuta vinculado (null si no hay). */
   therapistName?: string | null;
   /** Paciente: deja de compartir el registro con su terapeuta. */
   onEndLink?: () => Promise<void>;
   onClose: () => void;
   onToast: (text: string) => void;
-}) {
-  const auth = useAuth();
+}
+
+export function SettingsDialog(props: SettingsProps) {
+  return props.demo ? <DemoSettings {...props} demo={props.demo} /> : <AccountSettings {...props} />;
+}
+
+function ThemePicker() {
   const { theme } = useLocal();
+  return (
+    <div className="modal-section">
+      <h3>Tema</h3>
+      <div className="segmented" role="group" aria-label="Tema">
+        {THEMES.map(([value, label]) => (
+          <button key={value} type="button" aria-pressed={theme === value} onClick={() => local.setTheme(value)}>
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DemoSettings({ open, demo, onClose }: SettingsProps & { demo: DemoControls }) {
+  return (
+    <Modal open={open} title="Ajustes" onClose={onClose}>
+      <div className="modal-section">
+        <h3>Estás en la demo</h3>
+        <p>
+          Todo lo que ves son datos de ejemplo. Lo que cargues no se guarda en ningún lado y se borra al recargar la
+          página o al reiniciar la demo.
+        </p>
+        <div className="row">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              onClose();
+              demo.onReset();
+            }}
+          >
+            <RotateCcw />
+            Reiniciar la demo
+          </button>
+          <button type="button" className="btn btn-primary" onClick={demo.onExit}>
+            {demo.exitLabel}
+          </button>
+        </div>
+      </div>
+      <ThemePicker />
+    </Modal>
+  );
+}
+
+function AccountSettings({ open, profile, therapistName, onEndLink, onClose, onToast }: SettingsProps) {
+  const auth = useAuth();
   const ids = useId();
-  const profile = auth.profile!;
   const isPatient = profile.role === 'patient';
   const [name, setName] = useState(profile.full_name);
   const [password, setPassword] = useState('');
@@ -159,16 +214,7 @@ export function SettingsDialog({
         </div>
       )}
 
-      <div className="modal-section">
-        <h3>Tema</h3>
-        <div className="segmented" role="group" aria-label="Tema">
-          {THEMES.map(([value, label]) => (
-            <button key={value} type="button" aria-pressed={theme === value} onClick={() => local.setTheme(value)}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <ThemePicker />
 
       {isPatient && (
         <div className="modal-section">
@@ -231,11 +277,14 @@ function formatShort(iso: string) {
 export function InviteDialog({
   open,
   therapistName,
+  demo = false,
   onClose,
   onToast,
 }: {
   open: boolean;
   therapistName: string;
+  /** En la demo, los links son de ejemplo. */
+  demo?: boolean;
   onClose: () => void;
   onToast: (text: string) => void;
 }) {
@@ -307,6 +356,7 @@ export function InviteDialog({
             Con este link crea su cuenta y queda vinculada a la tuya. Sirve para una sola cuenta y vence el{' '}
             {formatShort(created.expires_at)}.
           </p>
+          {demo && <p className="demo-note">En la demo, el link es de ejemplo: no crea cuentas.</p>}
           <input className="input" readOnly value={url} onFocus={(e) => e.target.select()} aria-label="Link de invitación" />
           <div className="row">
             <button type="button" className="btn btn-primary" onClick={() => void copy(created)}>

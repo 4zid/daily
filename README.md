@@ -7,6 +7,13 @@ Dashboard para registrar las actividades de cada día y compartirlas con tu tera
 
 Extra: **"Contale tu día"**, un chat donde el paciente cuenta (o dicta por voz) cómo fue su día y la IA lo ordena en actividades. Revisa la propuesta, destilda lo que no va y la agrega al día.
 
+## Presentación y demo
+
+- **Presentación** (`#/bienvenida`): cinco pasos con ilustraciones animadas que muestran el registro, el chat y el informe. Aparece sola la primera vez que alguien abre la app sin sesión; después queda a mano desde la pantalla de ingreso (**Ver la presentación**). Se maneja con las flechas del teclado o deslizando en el celular, y respeta la opción del sistema de reducir movimiento.
+- **Demo como invitado** (`#/demo`): la app completa con datos de ejemplo, sin cuenta. Una barra flotante arriba permite pasar de **Paciente** a **Terapeuta** en cualquier momento: lo que se carga como paciente aparece en el informe del terapeuta. Links directos para mandar: `#/demo/paciente` y `#/demo/terapeuta`.
+  - Los datos viven solo en memoria (`src/lib/demo.ts`): la demo no lee ni escribe en Supabase. Al recargar la página o tocar **Reiniciar** vuelve al inicio.
+  - Sin sesión, el chat de la demo usa el modo básico (sin IA), porque la IA solo responde a usuarios con sesión. Si abrís la demo con tu cuenta iniciada, el chat usa la IA.
+
 ## Cuentas y vínculo terapeuta–paciente
 
 1. El terapeuta crea su cuenta desde **Creá una → Soy terapeuta**.
@@ -89,8 +96,10 @@ Si una actividad tiene hora de fin, se usa esa. Si solo tiene hora de inicio, cu
 api/organize.ts            Función serverless: verifica la sesión y ordena el relato con Claude
 supabase/migrations/       Esquema, reglas de acceso y funciones de la base
 vite.config.ts             Sirve /api/organize en desarrollo con el mismo handler
-src/App.tsx                Sesión: ingreso, app de paciente o de terapeuta
+src/App.tsx                Rutas y sesión: presentación, demo, ingreso, app de paciente o de terapeuta
 src/components/
+  Onboarding.tsx           Presentación en pasos con ilustraciones animadas
+  DemoApp.tsx              Demo como invitado: barra para cambiar de rol, reiniciar y salir
   AuthScreen.tsx           Ingreso, alta (terapeuta / paciente con invitación), recuperar contraseña
   PatientApp.tsx           Layout del paciente: semanas, registro, informe, chat, invitaciones
   TherapistApp.tsx         Layout del terapeuta: pacientes, semanas, informe, invitar
@@ -104,8 +113,10 @@ src/components/
 src/lib/
   supabase.ts              Cliente de Supabase y mensajes de error
   auth.tsx                 Sesión, perfil y acciones de cuenta
-  cloud.ts                 Lectura/escritura de registros, notas, vínculos e invitaciones
-  route.ts                 Rutas con hash (#/registro, #/informe, #/invitacion/…)
+  backend.ts               Acceso a Supabase (lecturas y escrituras), con la misma forma que la demo
+  cloud.ts                 Caché de semanas, guardado optimista, notas, vínculos e invitaciones
+  demo.ts                  Datos de ejemplo y base en memoria de la demo
+  route.ts                 Rutas con hash (#/registro, #/informe, #/invitacion/…, #/demo/…)
   store.ts                 Preferencias locales y registros de antes de tener cuenta
   stats.ts                 Duraciones y estadísticas semanales
   basicParser.ts           Modo básico sin IA

@@ -18,13 +18,24 @@ import {
 import { local, useLocal } from '../lib/store';
 import { inviteCodeFrom, navigate } from '../lib/route';
 import { AssistantChat, type ChatMessage } from './AssistantChat';
-import { SettingsDialog } from './Dialogs';
+import { SettingsDialog, type DemoControls } from './Dialogs';
 import { PatientView } from './PatientView';
 import { TherapistView } from './TherapistView';
 import { WeekList, mergeWeeks } from './WeekList';
 import { Brand, Modal, Toast, type ToastState } from './common';
 
-export function PatientApp({ profile, path }: { profile: Profile; path: string }) {
+export function PatientApp({
+  profile,
+  path,
+  onNavigate = navigate,
+  demo,
+}: {
+  profile: Profile;
+  path: string;
+  /** Cambia de ruta (en la demo, las rutas llevan el prefijo de la demo). */
+  onNavigate?: (path: string, replace?: boolean) => void;
+  demo?: DemoControls;
+}) {
   const today = todayISO();
   const thisWeek = weekStart(today);
   const view = path === 'informe' ? 'informe' : 'registro';
@@ -76,13 +87,13 @@ export function PatientApp({ profile, path }: { profile: Profile; path: string }
           setInvite({ code: inviteCode, therapistName: info.therapistName });
         } else {
           notify('Esa invitación no es válida, venció o ya se usó.');
-          navigate('registro', true);
+          onNavigate('registro', true);
         }
       })
       .catch(() => {
         if (!active) return;
         notify('No pude abrir la invitación. Probá de nuevo.');
-        navigate('registro', true);
+        onNavigate('registro', true);
       });
     return () => {
       active = false;
@@ -91,7 +102,7 @@ export function PatientApp({ profile, path }: { profile: Profile; path: string }
 
   function closeInvite() {
     setInvite(null);
-    navigate('registro', true);
+    onNavigate('registro', true);
   }
 
   async function confirmInvite() {
@@ -173,7 +184,7 @@ export function PatientApp({ profile, path }: { profile: Profile; path: string }
   );
 
   const banner =
-    localCount > 0 ? (
+    localCount > 0 && !demo ? (
       <div className="notice">
         <span className="notice-text">
           Tenés <b>{localCount} día{localCount === 1 ? '' : 's'}</b> guardado{localCount === 1 ? '' : 's'} en este navegador
@@ -197,10 +208,10 @@ export function PatientApp({ profile, path }: { profile: Profile; path: string }
       <header className="mobile-bar">
         <Brand />
         <div className="segmented" role="group" aria-label="Vista">
-          <button type="button" aria-pressed={view === 'registro'} onClick={() => navigate('registro')}>
+          <button type="button" aria-pressed={view === 'registro'} onClick={() => onNavigate('registro')}>
             Registro
           </button>
-          <button type="button" aria-pressed={view === 'informe'} onClick={() => navigate('informe')}>
+          <button type="button" aria-pressed={view === 'informe'} onClick={() => onNavigate('informe')}>
             Informe
           </button>
         </div>
@@ -219,7 +230,7 @@ export function PatientApp({ profile, path }: { profile: Profile; path: string }
                 type="button"
                 className="nav-item"
                 aria-current={view === 'registro' ? 'page' : undefined}
-                onClick={() => navigate('registro')}
+                onClick={() => onNavigate('registro')}
               >
                 <NotebookPen aria-hidden />
                 <span className="nav-text">Mi registro</span>
@@ -230,7 +241,7 @@ export function PatientApp({ profile, path }: { profile: Profile; path: string }
                 type="button"
                 className="nav-item"
                 aria-current={view === 'informe' ? 'page' : undefined}
-                onClick={() => navigate('informe')}
+                onClick={() => onNavigate('informe')}
               >
                 <ChartColumn aria-hidden />
                 <span className="nav-text">Informe semanal</span>
@@ -272,7 +283,7 @@ export function PatientApp({ profile, path }: { profile: Profile; path: string }
               <button
                 type="button"
                 className="promo-btn"
-                onClick={() => navigate(view === 'informe' ? 'registro' : 'informe')}
+                onClick={() => onNavigate(view === 'informe' ? 'registro' : 'informe')}
               >
                 {view === 'informe' ? 'Volver al registro' : 'Ver mi informe'}
               </button>
@@ -292,7 +303,7 @@ export function PatientApp({ profile, path }: { profile: Profile; path: string }
             onWeekStep={stepWeek}
             onToday={() => goToWeek(thisWeek)}
             onSelectDate={setSelectedDate}
-            onOpenReport={() => navigate('informe')}
+            onOpenReport={() => onNavigate('informe')}
             onRetry={weekState.reload}
             onDeleted={onDeleted}
             banner={banner}
@@ -338,6 +349,8 @@ export function PatientApp({ profile, path }: { profile: Profile; path: string }
 
       <SettingsDialog
         open={settingsOpen}
+        profile={profile}
+        demo={demo}
         therapistName={therapist}
         onEndLink={async () => {
           await endCareLink(profile.id);

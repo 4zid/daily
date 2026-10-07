@@ -13,7 +13,7 @@ import {
   type PatientSummary,
 } from '../lib/cloud';
 import { inviteCodeFrom, navigate } from '../lib/route';
-import { InviteDialog, SettingsDialog } from './Dialogs';
+import { InviteDialog, SettingsDialog, type DemoControls } from './Dialogs';
 import { TherapistView } from './TherapistView';
 import { WeekList, mergeWeeks } from './WeekList';
 import { Brand, Initials, Menu, Toast, type ToastState } from './common';
@@ -28,7 +28,18 @@ function readSelected(): string | null {
   }
 }
 
-export function TherapistApp({ profile, path }: { profile: Profile; path: string }) {
+export function TherapistApp({
+  profile,
+  path,
+  onNavigate = navigate,
+  demo,
+}: {
+  profile: Profile;
+  path: string;
+  /** Cambia de ruta (en la demo, las rutas llevan el prefijo de la demo). */
+  onNavigate?: (path: string, replace?: boolean) => void;
+  demo?: DemoControls;
+}) {
   const thisWeek = weekStart(todayISO());
   const inviteCode = inviteCodeFrom(path);
 
@@ -81,7 +92,7 @@ export function TherapistApp({ profile, path }: { profile: Profile; path: string
   useEffect(() => {
     if (!inviteCode) return;
     notify('Ese link es para que un paciente cree su cuenta. Mandáselo a tu paciente.');
-    navigate('informe', true);
+    onNavigate('informe', true);
   }, [inviteCode, notify]);
 
   function selectPatient(id: string) {
@@ -302,6 +313,7 @@ export function TherapistApp({ profile, path }: { profile: Profile; path: string
 
       <InviteDialog
         open={inviteOpen}
+        demo={Boolean(demo)}
         therapistName={profile.full_name}
         onClose={() => {
           setInviteOpen(false);
@@ -309,7 +321,13 @@ export function TherapistApp({ profile, path }: { profile: Profile; path: string
         }}
         onToast={notify}
       />
-      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} onToast={notify} />
+      <SettingsDialog
+        open={settingsOpen}
+        profile={profile}
+        demo={demo}
+        onClose={() => setSettingsOpen(false)}
+        onToast={notify}
+      />
       <Toast toast={toast} onDone={clearToast} />
     </div>
   );

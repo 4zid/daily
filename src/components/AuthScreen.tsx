@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../lib/auth';
 import { lookupInvitation } from '../lib/cloud';
 import { navigate } from '../lib/route';
+import { markOnboardingSeen } from '../lib/store';
 import { authErrorMessage } from '../lib/supabase';
 import { Brand, Initials } from './common';
 
@@ -48,10 +49,19 @@ function cleanCode(value: string): string {
   return (fromLink ?? value).replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 32);
 }
 
-export function AuthScreen({ inviteCode, recovery }: { inviteCode: string | null; recovery: boolean }) {
+export function AuthScreen({
+  inviteCode,
+  recovery,
+  initialMode = 'login',
+}: {
+  inviteCode: string | null;
+  recovery: boolean;
+  /** Pantalla con la que abre ("#/crear-cuenta" abre el alta). */
+  initialMode?: 'login' | 'signup';
+}) {
   const auth = useAuth();
   const ids = useId();
-  const [mode, setMode] = useState<Mode>(inviteCode ? 'signup' : 'login');
+  const [mode, setMode] = useState<Mode>(inviteCode ? 'signup' : initialMode);
   const [role, setRole] = useState<Role>(inviteCode ? 'patient' : 'therapist');
   const [code, setCode] = useState(inviteCode ?? '');
   const [fromLink, setFromLink] = useState(Boolean(inviteCode));
@@ -63,6 +73,16 @@ export function AuthScreen({ inviteCode, recovery }: { inviteCode: string | null
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [invite, setInvite] = useState<InviteInfo>({ status: 'idle' });
+
+  // Quien llega al ingreso ya no necesita la presentación (por ejemplo, desde una
+  // invitación): así, después de crear la cuenta, no aparece en lugar del aviso.
+  useEffect(() => markOnboardingSeen(), []);
+
+  // "#/ingresar" y "#/crear-cuenta" cambian de pantalla aunque ya esté abierta.
+  useEffect(() => {
+    if (!inviteCode) go(initialMode);
+    // Solo cuando cambia la ruta.
+  }, [initialMode]);
 
   // Si se abre otro link de invitación con la pantalla abierta.
   useEffect(() => {
@@ -396,7 +416,7 @@ export function AuthScreen({ inviteCode, recovery }: { inviteCode: string | null
           <circle cx="360" cy="560" r="160" />
           <circle cx="60" cy="40" r="120" />
           <circle className="fill" cx="300" cy="120" r="3" />
-          <circle className="fill" cx="340" cy="250" r="3" />
+          <circle className="fill" cx="350" cy="470" r="3" />
         </svg>
         <Brand />
         <div className="auth-pitch">
@@ -434,6 +454,22 @@ export function AuthScreen({ inviteCode, recovery }: { inviteCode: string | null
           </form>
           {foot && <div className="tray-foot auth-foot">{foot}</div>}
         </div>
+        {!inviteCode && !recovery && (
+          <div className="auth-demo">
+            <span className="auth-demo-text">
+              <b>¿Querés ver cómo funciona?</b> Probala con datos de ejemplo, sin cuenta.
+            </span>
+            <span className="auth-demo-actions">
+              <button type="button" className="btn btn-sm btn-primary" onClick={() => navigate('demo/paciente')}>
+                Probar la demo
+                <ArrowRight aria-hidden />
+              </button>
+              <button type="button" className="link-btn" onClick={() => navigate('bienvenida')}>
+                Ver la presentación
+              </button>
+            </span>
+          </div>
+        )}
       </main>
     </div>
   );

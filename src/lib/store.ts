@@ -137,3 +137,24 @@ export function parseBackup(text: string): { patientName: string; days: Record<s
     days: sanitizeDays(parsed.days),
   };
 }
+
+// ─────────── Presentación (onboarding) ───────────
+
+const ONBOARDING_KEY = 'daily.presentacion.v1';
+
+/** Si en este navegador ya se vio la presentación. */
+export function hasSeenOnboarding(): boolean {
+  try {
+    return localStorage.getItem(ONBOARDING_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markOnboardingSeen() {
+  try {
+    localStorage.setItem(ONBOARDING_KEY, '1');
+  } catch {
+    // Sin almacenamiento: la presentación vuelve a aparecer la próxima vez.
+  }
+}
