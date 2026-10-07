@@ -15,7 +15,6 @@
     "url": "git+https://github.com/4zid/daily.git"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.131.0",
     "@supabase/supabase-js": "^2.117.2",
     "lucide-react": "^1.52.0",
     "react": "^19.3.0",

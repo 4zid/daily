@@ -1,14 +1,32 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 // Función serverless (Vercel) que ordena el relato del día en actividades.
 // En desarrollo la sirve el plugin de vite.config.ts con este mismo handler.
+//
+// Usa cualquier API compatible con OpenAI (chat/completions). Por defecto, Groq,
+// que tiene un plan gratis: alcanza con GROQ_API_KEY. Para usar otro proveedor,
+// AI_BASE_URL, AI_API_KEY y AI_MODEL (ver README).
 
 // Mismos valores públicos que usa la app (src/lib/supabase.ts).
 const SUPABASE_URL = process.env.SUPABASE_URL ?? 'https://kiifochsbrbuhyrrmwsv.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_ApxSFOfQ-VBD-Zbb5Cs9NQ_TCzvVWIf';
+
+const DEFAULT_BASE_URL = 'https://api.groq.com/openai/v1';
+// Si el primero llega a su límite gratis del día, se prueba el siguiente (cada modelo tiene el suyo).
+const DEFAULT_MODELS = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+
+// Tiempo máximo por intento, para que un modelo lento no deje colgado el chat.
+const ATTEMPT_TIMEOUT_MS = 45_000;
+
+function aiConfig() {
+  const custom = process.env.AI_MODEL?.split(',').map((m) => m.trim()).filter(Boolean);
+  return {
+    baseUrl: (process.env.AI_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, ''),
+    apiKey: process.env.AI_API_KEY || process.env.GROQ_API_KEY || '',
+    models: custom?.length ? custom : DEFAULT_MODELS,
+  };
+}
 
 /** Devuelve el id del usuario si el token de sesión es válido. */
 async function verifySession(request: Request): Promise<string | null> {
@@ -51,7 +69,9 @@ En la conversación:
 - Si en un mensaje posterior la persona corrige o agrega algo, devolvé la lista completa y actualizada de lo que todavía no está guardado.
 - No des consejos clínicos ni interpretes lo que le pasa.
 
-"supportNote": si la persona menciona ideas de hacerse daño, de quitarse la vida o que está en peligro, escribí un mensaje breve y contenedor que la anime a comunicarse ya con su terapeuta o con un servicio de emergencias, sin minimizar lo que siente. En cualquier otro caso, null.`;
+"supportNote": si la persona menciona ideas de hacerse daño, de quitarse la vida o que está en peligro, escribí un mensaje breve y contenedor que la anime a comunicarse ya con su terapeuta o con un servicio de emergencias, sin minimizar lo que siente. En cualquier otro caso, null.
+
+Respondé solo con el objeto JSON pedido, sin texto antes ni después.`;
 
 const EntrySchema = z.object({
   start: z.string().describe('Hora de inicio en formato 24 h HH:MM'),
@@ -71,6 +91,10 @@ const OrganizedDaySchema = z.object({
   supportNote: z.string().nullable(),
 });
 
+// Esquema estricto para la API: todos los campos obligatorios, null donde corresponde
+// y sin propiedades extra.
+const { $schema: _draft, ...RESPONSE_SCHEMA } = z.toJSONSchema(OrganizedDaySchema, { target: 'draft-7' });
+
 // Turnos de conversación previos que se mandan a la IA (los más recientes).
 const MAX_HISTORY_TURNS = 30;
 
@@ -88,12 +112,17 @@ const RequestSchema = z.object({
 
 type OrganizeRequest = z.infer<typeof RequestSchema>;
 
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-function buildMessages(req: OrganizeRequest): Anthropic.Beta.BetaMessageParam[] {
-  const messages: Anthropic.Beta.BetaMessageParam[] = [];
+function buildMessages(req: OrganizeRequest): ChatMessage[] {
+  const messages: ChatMessage[] = [];
   for (const turn of req.history.slice(-MAX_HISTORY_TURNS)) {
     // La conversación tiene que empezar con un mensaje de la persona.
     if (messages.length === 0 && turn.role !== 'user') continue;
@@ -108,15 +137,92 @@ function buildMessages(req: OrganizeRequest): Anthropic.Beta.BetaMessageParam[] 
     role: 'user',
     content: `Día: ${req.dateLabel} (${req.date})\nActividades ya guardadas ese día:\n${saved}\n\nMensaje:\n${req.message}`,
   });
-  return messages;
+  return [{ role: 'system', content: SYSTEM_PROMPT }, ...messages];
+}
+
+// retry: vale la pena probar con el modelo siguiente.
+type Failure = { ok: false; retry: boolean; status: number; error: string; message: string };
+/** Resultado de un intento con un modelo. */
+type Attempt = { ok: true; day: z.infer<typeof OrganizedDaySchema> } | Failure;
+
+const FAILURES = {
+  auth: { status: 500, error: 'auth', message: 'La clave de la API de la IA no es válida.' },
+  rateLimited: { status: 429, error: 'rate_limited', message: 'Hay muchos pedidos en este momento. Probá en un minuto.' },
+  connection: { status: 502, error: 'connection', message: 'No me pude conectar con la IA. Probá de nuevo.' },
+  api: { status: 502, error: 'api', message: 'La IA devolvió un error. Probá de nuevo en un momento.' },
+  parse: { status: 502, error: 'parse_error', message: 'No pude ordenar este relato. Probá de nuevo o cargalo a mano.' },
+  refusal: { status: 422, error: 'refusal', message: 'No pude procesar este relato. Probá cargándolo a mano.' },
+} as const;
+
+const fail = (kind: keyof typeof FAILURES, retry: boolean): Failure => ({ ok: false, retry, ...FAILURES[kind] });
+
+async function attempt(
+  config: ReturnType<typeof aiConfig>,
+  model: string,
+  messages: ChatMessage[],
+): Promise<Attempt> {
+  let res: Response;
+  try {
+    res = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages,
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'dia_ordenado', strict: true, schema: RESPONSE_SCHEMA },
+        },
+        temperature: 0.3,
+        max_completion_tokens: 8000,
+      }),
+      signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+    });
+  } catch {
+    return fail('connection', true);
+  }
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    console.error('IA: error de la API', model, res.status, detail.slice(0, 300));
+    if (res.status === 401 || res.status === 403) return fail('auth', false);
+    if (res.status === 429) return fail('rateLimited', true);
+    // 400 con la salida que no respetó el esquema: otro modelo puede hacerlo bien.
+    if (res.status === 400 && /json_validate_failed|schema/i.test(detail)) return fail('parse', true);
+    return fail('api', res.status >= 500 || res.status === 404);
+  }
+
+  const body = (await res.json().catch(() => null)) as {
+    choices?: { finish_reason?: string; message?: { content?: string | null; refusal?: string | null } }[];
+  } | null;
+  const choice = body?.choices?.[0];
+  if (choice?.message?.refusal) return fail('refusal', false);
+  if (!choice?.message?.content || choice.finish_reason === 'length') {
+    console.error('IA: respuesta incompleta', model, choice?.finish_reason);
+    return fail('parse', true);
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(choice.message.content);
+  } catch {
+    console.error('IA: la respuesta no es JSON', model);
+    return fail('parse', true);
+  }
+  const parsed = OrganizedDaySchema.safeParse(raw);
+  if (!parsed.success) {
+    console.error('IA: la respuesta no respeta el esquema', model);
+    return fail('parse', true);
+  }
+  return { ok: true, day: parsed.data };
 }
 
 export async function POST(request: Request): Promise<Response> {
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
-    return json({ error: 'not_configured', message: 'Falta configurar ANTHROPIC_API_KEY.' }, 503);
+  const config = aiConfig();
+  if (!config.apiKey) {
+    return json({ error: 'not_configured', message: 'Falta configurar GROQ_API_KEY.' }, 503);
   }
 
-  // Solo usuarios con sesión iniciada: así nadie más gasta tu clave.
+  // Solo usuarios con sesión iniciada: así nadie más usa tu clave.
   if (!(await verifySession(request))) {
     return json({ error: 'unauthorized', message: 'Tu sesión venció. Volvé a ingresar.' }, 401);
   }
@@ -126,52 +232,13 @@ export async function POST(request: Request): Promise<Response> {
     return json({ error: 'bad_request', message: 'El pedido no tiene el formato esperado.' }, 400);
   }
 
-  const client = new Anthropic();
-  try {
-    const response = await client.beta.messages.parse({
-      model: 'claude-opus-5-5',
-      max_tokens: 16000,
-      // Si el modelo declina el pedido, la API lo reintenta con un modelo alternativo.
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      output_config: { effort: 'medium', format: betaZodOutputFormat(OrganizedDaySchema) },
-      system: SYSTEM_PROMPT,
-      messages: buildMessages(parsedBody.data),
-    });
-
-    if (response.stop_reason === 'refusal') {
-      return json(
-        { error: 'refusal', message: 'No pude procesar este relato. Probá cargándolo a mano.' },
-        422,
-      );
-    }
-    if (!response.parsed_output) {
-      return json({ error: 'parse_error', message: 'La respuesta de la IA vino incompleta. Probá de nuevo.' }, 502);
-    }
-    return json(response.parsed_output);
-  } catch (error) {
-    if (error instanceof Anthropic.AuthenticationError) {
-      console.error('Anthropic: clave inválida');
-      return json({ error: 'auth', message: 'La clave de la API de Anthropic no es válida.' }, 500);
-    }
-    if (error instanceof Anthropic.RateLimitError) {
-      return json({ error: 'rate_limited', message: 'Hay muchos pedidos en este momento. Probá en un minuto.' }, 429);
-    }
-    if (error instanceof Anthropic.APIConnectionError) {
-      return json({ error: 'connection', message: 'No me pude conectar con la IA. Probá de nuevo.' }, 502);
-    }
-    if (error instanceof Anthropic.APIError) {
-      console.error('Anthropic API error', error.status, error.message);
-      return json({ error: 'api', message: 'La IA devolvió un error. Probá de nuevo en un momento.' }, 502);
-    }
-    if (error instanceof Anthropic.AnthropicError) {
-      // parse() falla si la respuesta quedó cortada o se declinó a mitad de camino.
-      console.error('Anthropic: respuesta no válida', error.message);
-      return json(
-        { error: 'parse_error', message: 'No pude ordenar este relato. Probá de nuevo o cargalo a mano.' },
-        502,
-      );
-    }
-    throw error;
+  const messages = buildMessages(parsedBody.data);
+  let failure: Failure = fail('api', false);
+  for (const model of config.models) {
+    const result = await attempt(config, model, messages);
+    if (result.ok) return json(result.day);
+    failure = result;
+    if (!result.retry) break;
   }
+  return json({ error: failure.error, message: failure.message }, failure.status);
 }

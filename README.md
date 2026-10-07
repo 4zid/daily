@@ -63,18 +63,31 @@ Abrí http://localhost:5173.
 
 ### Activar la IA
 
-Sin configurar nada, el chat funciona en **modo básico**: reconoce horarios ("a las 9", "de 10 a 13", "a la tarde") y adivina la categoría por palabras clave. Para que lo ordene la IA (Claude), creá un archivo `.env.local` en la raíz:
+Sin configurar nada, el chat funciona en **modo básico**: reconoce horarios ("a las 9", "de 10 a 13", "a la tarde") y adivina la categoría por palabras clave. Para que lo ordene la IA, usá [Groq](https://console.groq.com), que tiene un plan gratis (sin tarjeta):
+
+1. Creá una cuenta en https://console.groq.com y generá una clave en **API Keys**.
+2. Creá un archivo `.env.local` en la raíz:
+
+   ```bash
+   GROQ_API_KEY=tu-clave
+   ```
+
+3. Reiniciá `npm run dev`.
+
+La clave queda del lado del servidor: nunca llega al navegador. La función solo responde a usuarios con sesión iniciada, así que nadie de afuera puede gastar tu cupo. Por defecto usa `openai/gpt-oss-120b`, y si ese modelo llega a su límite gratis del día pasa a `openai/gpt-oss-20b` (cada modelo tiene su propio cupo).
+
+**Otro proveedor.** La función habla con cualquier API compatible con OpenAI que admita salida con esquema JSON (`response_format: json_schema`). Para cambiar de proveedor o de modelo:
 
 ```bash
-ANTHROPIC_API_KEY=tu-clave        # https://console.anthropic.com
+AI_BASE_URL=https://api.otro-proveedor.com/v1   # por defecto, Groq
+AI_API_KEY=tu-clave                             # si está, se usa en vez de GROQ_API_KEY
+AI_MODEL=modelo-principal,modelo-de-respaldo    # se prueban en orden
 ```
-
-y reiniciá `npm run dev`. La clave queda del lado del servidor: nunca llega al navegador. La función solo responde a usuarios con sesión iniciada, así que nadie de afuera puede gastar tu clave.
 
 ## Publicarlo (Vercel)
 
 1. Importá este repositorio en Vercel (detecta Vite solo).
-2. En **Settings → Environment Variables** agregá `ANTHROPIC_API_KEY`.
+2. En **Settings → Environment Variables** agregá `GROQ_API_KEY`.
 3. Deploy (o **Redeploy** si agregaste la variable después: Vercel las toma al construir). La carpeta `api/` se publica como función serverless (`/api/organize`).
 
 Compartí siempre el dominio de producción del proyecto (el `.vercel.app` corto que figura en **Domains**): las URLs de cada despliegue quedan detrás del login de Vercel, y los links de invitación usan el dominio desde el que se crearon.
@@ -83,7 +96,7 @@ Compartí siempre el dominio de producción del proyecto (el `.vercel.app` corto
 
 - Los registros y las notas se guardan en Supabase, protegidos por las reglas de acceso de arriba.
 - **Ajustes → Descargar mis registros** baja un `.json` con todo lo del paciente.
-- Lo que se escribe en el chat se envía a la API de Anthropic para ordenarlo (solo si la IA está configurada).
+- Lo que se escribe en el chat se envía a la API de Groq (o al proveedor que configures) para ordenarlo, solo si la IA está configurada. Revisá las condiciones de privacidad del proveedor antes de usarlo con pacientes.
 - Las notas de sesión no se imprimen en el informe.
 
 ## Duraciones
@@ -93,7 +106,7 @@ Si una actividad tiene hora de fin, se usa esa. Si solo tiene hora de inicio, cu
 ## Estructura
 
 ```
-api/organize.ts            Función serverless: verifica la sesión y ordena el relato con Claude
+api/organize.ts            Función serverless: verifica la sesión y ordena el relato con la IA (Groq)
 supabase/migrations/       Esquema, reglas de acceso y funciones de la base
 vite.config.ts             Sirve /api/organize en desarrollo con el mismo handler
 src/App.tsx                Rutas y sesión: presentación, demo, ingreso, app de paciente o de terapeuta

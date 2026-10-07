@@ -49,7 +49,7 @@ async function toRequest(req: IncomingMessage): Promise<Request> {
 export default defineConfig(({ mode }) => {
   // Expone las variables del servidor de .env.local al handler (nunca al navegador).
   const env = loadEnv(mode, process.cwd(), '');
-  for (const key of ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY']) {
+  for (const key of ['GROQ_API_KEY', 'AI_API_KEY', 'AI_BASE_URL', 'AI_MODEL', 'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY']) {
     if (env[key] && !process.env[key]) process.env[key] = env[key];
   }
   return {
