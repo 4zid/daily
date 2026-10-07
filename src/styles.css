@@ -3252,6 +3252,27 @@ dialog.modal::backdrop {
   }
 }
 
+.error-detail {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.error-detail summary {
+  cursor: pointer;
+}
+
+.error-detail pre {
+  margin: 8px 0 0;
+  padding: 12px;
+  overflow: auto;
+  max-height: 180px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ═════════════════════════ Pacientes e invitaciones ═════════════════════════ */
 
 .initials {

@@ -8,6 +8,13 @@ function devApi(): Plugin {
   return {
     name: 'daily-dev-api',
     configureServer(server) {
+      // En desarrollo, los reportes de error solo se muestran en la consola.
+      server.middlewares.use('/api/client-error', async (req, res) => {
+        const { POST } = (await server.ssrLoadModule('/api/client-error.ts')) as typeof import('./api/client-error');
+        const response = await POST(await toRequest(req));
+        res.statusCode = response.status;
+        res.end();
+      });
       server.middlewares.use('/api/organize', async (req, res) => {
         try {
           const { POST } = (await server.ssrLoadModule('/api/organize.ts')) as typeof import('./api/organize');

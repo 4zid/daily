@@ -5,6 +5,7 @@ import { inviteCodeFrom, navigate, useHashPath } from './lib/route';
 import { hasSeenOnboarding, markOnboardingSeen, useLocal } from './lib/store';
 import { AuthScreen } from './components/AuthScreen';
 import { DemoApp } from './components/DemoApp';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Onboarding } from './components/Onboarding';
 import { PatientApp } from './components/PatientApp';
 import { TherapistApp } from './components/TherapistApp';
@@ -14,9 +15,18 @@ import { Brand } from './components/common';
 // "#/ingresar", "#/crear-cuenta", "#/invitacion/CÓDIGO", y las de la app.
 
 export default function App() {
+  const path = useHashPath();
+  // Si una pantalla falla, se muestra un aviso para reintentar (y al cambiar de ruta se reintenta sola).
+  return (
+    <ErrorBoundary resetKey={path}>
+      <Screens path={path} />
+    </ErrorBoundary>
+  );
+}
+
+function Screens({ path }: { path: string }) {
   const auth = useAuth();
   const { theme } = useLocal();
-  const path = useHashPath();
 
   useEffect(() => {
     const root = document.documentElement;
