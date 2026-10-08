@@ -46,7 +46,8 @@ export function DemoApp({ path, signedIn }: { path: string; signedIn: boolean })
     setRound((r) => r + 1);
   }, []);
 
-  const exit = useCallback(() => navigate(signedIn ? '' : 'ingresar'), [signedIn]);
+  // Sin sesión, "/" es la landing de donde vino; con sesión, su app.
+  const exit = useCallback(() => navigate(''), []);
 
   const controls: DemoControls = {
     onReset: reset,

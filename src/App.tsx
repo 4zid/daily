@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useAuth } from './lib/auth';
 import { resetCloudCache } from './lib/cloud';
 import { inviteCodeFrom, navigate, useHashPath } from './lib/route';
-import { hasSeenOnboarding, markOnboardingSeen, useLocal } from './lib/store';
+import { hadSessionHere, hasSeenOnboarding, markHadSession, markOnboardingSeen, useLocal } from './lib/store';
 import { AuthScreen } from './components/AuthScreen';
 import { DemoApp } from './components/DemoApp';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -47,6 +47,7 @@ function Screens({ path }: { path: string }) {
   useEffect(() => {
     if (!signedIn) return;
     markOnboardingSeen();
+    markHadSession();
     if (path === 'ingresar' || path === 'crear-cuenta') navigate('', true);
   }, [signedIn, path]);
 
@@ -63,10 +64,13 @@ function Screens({ path }: { path: string }) {
   if (path === 'bienvenida' && auth.status !== 'recovery') return <Onboarding signedIn={signedIn} />;
 
   if (auth.status === 'signed-out' || auth.status === 'recovery') {
-    // La puerta de entrada pública: quien llega sin sesión ve la landing.
-    if (path === '' && auth.status === 'signed-out') return <Landing />;
+    // La puerta de entrada pública: quien llega sin sesión ve la landing. Quien ya usó una
+    // cuenta en este navegador (cerró sesión o se le venció) o vuelve desde un link de email
+    // de confirmación o recuperación va directo al ingreso.
+    const fromAuthLink = /[?&](code|error)=/.test(window.location.search);
+    if (path === '' && auth.status === 'signed-out' && !hadSessionHere() && !fromAuthLink) return <Landing />;
     const inviteCode = inviteCodeFrom(path);
-    const explicit = path === 'ingresar' || path === 'crear-cuenta';
+    const explicit = path === 'ingresar' || path === 'crear-cuenta' || fromAuthLink;
     if (!inviteCode && !explicit && auth.status === 'signed-out' && !hasSeenOnboarding()) return <Onboarding />;
     return (
       <AuthScreen

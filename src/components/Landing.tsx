@@ -17,13 +17,15 @@ import {
   Lock,
   Mic,
   NotebookPen,
+  Pause,
   Play,
   Printer,
   ShieldCheck,
   Smartphone,
-  Sparkles,
   UserPlus,
   Users,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import type { Rating } from '../types';
 import { navigate } from '../lib/route';
@@ -34,6 +36,20 @@ import '../landing.css';
 // terapeuta (quien elige daily) y muestra el producto real con microinteracciones.
 // Todo lo que se mueve respeta "reducir movimiento".
 
+// El video del hero (H.264 1600×900, con efectos de sonido) y su póster, en public/video.
+const VIDEO_SRC = '/video/daily-demo.mp4';
+const VIDEO_POSTER = '/video/daily-demo-poster.jpg';
+
+// Capítulos del video, en segundos desde el inicio. Si cambia el corte, se ajustan acá:
+// cada capítulo dura hasta que empieza el siguiente, y el último hasta el final.
+const VIDEO_CHAPTERS = [
+  { t: 0, label: 'Registro' },
+  { t: 15.5, label: 'Con IA' },
+  { t: 22.5, label: 'Su semana' },
+  { t: 28.7, label: 'Informe' },
+  { t: 39.3, label: 'Invitación' },
+];
+
 const SECTIONS = [
   { id: 'como-funciona', label: 'Cómo funciona' },
   { id: 'funciones', label: 'Funciones' },
@@ -42,16 +58,37 @@ const SECTIONS = [
 ] as const;
 
 export function Landing() {
+  const rootRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const previous = document.title;
-    document.title = 'daily · Registro diario con IA para terapeutas y pacientes';
+    document.title = 'daily · Registro diario de actividades para terapia';
     return () => {
       document.title = previous;
     };
   }, []);
 
+  // Al llegar desde otra pantalla (salir de la demo) la landing arranca arriba, y al irse
+  // (demo, alta, ingreso) la pantalla nueva también.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    return () => window.scrollTo(0, 0);
+  }, []);
+
+  // Las animaciones en bucle de una sección se pausan mientras está fuera de pantalla.
+  // Se marca lo que está afuera (no lo que está adentro): sin IntersectionObserver, todo sigue animando.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver((entries) => {
+      for (const entry of entries) entry.target.classList.toggle('is-offscreen', !entry.isIntersecting);
+    });
+    root.querySelectorAll('.lp-hero, .lp-section, .lp-final').forEach((s) => io.observe(s));
+    return () => io.disconnect();
+  }, []);
+
   return (
-    <div className="lp">
+    <div className="lp" ref={rootRef}>
       <Nav />
       <main>
         <Hero />
@@ -207,11 +244,18 @@ function spotlight(e: ReactPointerEvent<HTMLElement>) {
   el.style.setProperty('--sy', `${e.clientY - r.top}px`);
 }
 
+/** Lleva a una sección y le pasa el foco a su título, así el teclado sigue desde ahí. */
 function scrollToSection(id: string) {
   const el = document.getElementById(id);
   if (!el) return;
-  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+  const behavior: ScrollBehavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  if (id === 'inicio') window.scrollTo({ top: 0, behavior });
+  else el.scrollIntoView({ behavior, block: 'start' });
+  const heading = el.querySelector<HTMLElement>('h1, h2');
+  if (heading) {
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }
 }
 
 // ─────────────────────────────── navegación ───────────────────────────────
@@ -255,7 +299,7 @@ function Nav() {
   return (
     <header className={`lp-nav${scrolled ? ' is-scrolled' : ''}`}>
       <div className="lp-nav-inner">
-        <button type="button" className="lp-nav-brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="daily, volver al inicio">
+        <button type="button" className="lp-nav-brand" onClick={() => scrollToSection('inicio')} aria-label="daily, volver al inicio">
           <Brand />
         </button>
         <nav className="lp-nav-links" ref={linksRef} aria-label="Secciones">
@@ -271,7 +315,11 @@ function Nav() {
             Ingresar
           </button>
           <button type="button" className="lp-btn lp-btn-primary lp-btn-sm" onClick={() => navigate('demo/terapeuta')}>
-            <span className="lp-btn-inner">Probar la demo</span>
+            {/* En el celular el nombre corto deja lugar a "Ingresar". */}
+            <span className="lp-btn-inner">
+              <span className="lp-nav-demo-full">Probar la demo</span>
+              <span className="lp-nav-demo-short">Demo</span>
+            </span>
           </button>
         </div>
       </div>
@@ -284,61 +332,358 @@ function Nav() {
 function Hero() {
   return (
     <section className="lp-hero" id="inicio" aria-labelledby="lp-hero-title">
-      <div className="lp-hero-glow" aria-hidden />
-      <div className="lp-wrap lp-hero-grid">
-        <div className="lp-hero-copy">
-          <Reveal eager i={0}>
-            <span className="lp-eyebrow">
-              <span className="lp-pulse" aria-hidden />
-              Registro diario con IA para terapia
-            </span>
-          </Reveal>
-          <Reveal eager i={1}>
-            <h1 id="lp-hero-title" className="lp-h1">
-              Llegá a cada sesión sabiendo <span className="lp-ink">cómo fue su semana.</span>
-            </h1>
-          </Reveal>
-          <Reveal eager i={2}>
-            <p className="lp-lead">
-              Tus pacientes cuentan su día con sus palabras. daily lo ordena en actividades con placer y control, y vos lo
-              ves en un informe semanal listo para la sesión.
-            </p>
-          </Reveal>
-          <Reveal eager i={3} className="lp-hero-ctas">
-            <CtaButton onClick={() => navigate('crear-cuenta')} icon={<UserPlus aria-hidden />}>
-              Crear cuenta de terapeuta
-            </CtaButton>
-            <CtaButton variant="ghost" onClick={() => navigate('demo/terapeuta')} icon={<Play aria-hidden />}>
-              Ver la demo
-            </CtaButton>
-          </Reveal>
-          <Reveal eager i={4}>
-            <ul className="lp-trust">
-              <li>
-                <Smartphone aria-hidden /> Sin instalar nada
-              </li>
-              <li>
-                <Mic aria-hidden /> Escrito o dictado
-              </li>
-              <li>
-                <Lock aria-hidden /> Solo vos y tu paciente lo ven
-              </li>
-            </ul>
-          </Reveal>
-        </div>
-        <Reveal eager i={2} className="lp-hero-art">
-          <HeroPreview />
+      <div className="lp-hero-bg" aria-hidden>
+        <span className="lp-hero-glow" />
+        <span className="lp-hero-rings" />
+      </div>
+      <div className="lp-wrap lp-hero-copy">
+        <Reveal eager i={0}>
+          <span className="lp-eyebrow">
+            <span className="lp-pulse" aria-hidden />
+            Registro diario de actividades para terapia
+          </span>
+        </Reveal>
+        <Reveal eager i={1}>
+          <h1 id="lp-hero-title" className="lp-h1">
+            Llegá a cada sesión sabiendo cómo fue <span className="lp-ink">la semana de tu paciente.</span>
+          </h1>
+        </Reveal>
+        <Reveal eager i={2}>
+          <p className="lp-lead">
+            Tu paciente registra cada día qué hizo, cuánto lo disfrutó y cuánto control sintió. Vos lo ves en un informe
+            semanal, listo para la sesión.
+          </p>
+        </Reveal>
+        <Reveal eager i={3} className="lp-hero-ctas">
+          <CtaButton onClick={() => navigate('crear-cuenta')} icon={<UserPlus aria-hidden />}>
+            Crear cuenta de terapeuta
+          </CtaButton>
+          <CtaButton variant="ghost" onClick={() => navigate('demo/terapeuta')} icon={<Play aria-hidden />}>
+            Ver la demo
+          </CtaButton>
+        </Reveal>
+        <Reveal eager i={4}>
+          <ul className="lp-trust">
+            <li>
+              <Smartphone aria-hidden /> Sin instalar nada
+            </li>
+            <li>
+              <Check aria-hidden /> Gratis
+            </li>
+            <li>
+              <Lock aria-hidden /> Registros privados: solo vos y tu paciente
+            </li>
+          </ul>
         </Reveal>
       </div>
+      <HeroVideo />
     </section>
   );
 }
 
-// El producto en vivo: una vuelta de 10 s que es función del tiempo (como un video),
-// con pestañas que saltan a cada vista y pausa al pasar el mouse.
-const LOOP = 10;
-const SWITCH = 5.6;
-const SENTENCE = 'A las 18:30 salí a caminar por el parque. Placer\u00a09, control\u00a08.';
+// El video del producto: arranca solo (sin sonido) mientras se ve y se pausa al salir de
+// pantalla o al cambiar de pestaña. Con "reducir movimiento" o ahorro de datos no arranca
+// solo: queda el póster con un botón grande. Siempre hay botones para pausar y para el sonido.
+
+/** 'auto': se reproduce mientras se ve. 'play' / 'pause': lo eligió quien mira. */
+type VideoIntent = 'auto' | 'play' | 'pause';
+
+const saveData = () =>
+  typeof navigator !== 'undefined' && (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
+
+/** El capítulo que corresponde al segundo `t` (el último que ya empezó). */
+function chapterAt(t: number): number {
+  let i = 0;
+  VIDEO_CHAPTERS.forEach((c, j) => {
+    if (t >= c.t) i = j;
+  });
+  return i;
+}
+
+function HeroVideo() {
+  const reduced = useReducedMotion();
+  const stageRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const chapterRef = useRef(0);
+  const [intent, setIntent] = useState<VideoIntent>(() => (reduced || saveData() ? 'pause' : 'auto'));
+  const [inView, setInView] = useState(false);
+  const [pageVisible, setPageVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden');
+  const [playing, setPlaying] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const [duration, setDuration] = useState(0);
+  const [chapter, setChapter] = useState(0);
+  const [failed, setFailed] = useState(false);
+
+  // Si "reducir movimiento" se activa con la página abierta, deja de arrancar solo.
+  useEffect(() => {
+    if (reduced) setIntent((v) => (v === 'auto' ? 'pause' : v));
+  }, [reduced]);
+
+  const wantsPlay = intent === 'play' || (intent === 'auto' && !reduced);
+  const shouldPlay = wantsPlay && inView && pageVisible && !failed;
+
+  // Se reproduce solo mientras se ve (al menos un cuarto) y la pestaña está a la vista.
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setInView(true);
+      return;
+    }
+    const io = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting && entry.intersectionRatio >= 0.25), {
+      threshold: [0, 0.25, 0.5],
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const onVisibility = () => setPageVisible(document.visibilityState !== 'hidden');
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = muted;
+  }, [muted]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (!shouldPlay) {
+      if (!video.paused) video.pause();
+      return;
+    }
+    video.play().catch((err: unknown) => {
+      // El navegador no lo deja arrancar (ahorro de batería, por ejemplo): queda el póster con el botón.
+      if (err instanceof DOMException && err.name === 'NotAllowedError') setIntent('pause');
+    });
+  }, [shouldPlay]);
+
+  // Mientras está en pausa por elección, el resto del hero también se queda quieto.
+  useEffect(() => {
+    stageRef.current?.closest('.lp-hero')?.classList.toggle('is-still', !wantsPlay);
+  }, [wantsPlay]);
+
+  // El capítulo activo y su barra de avance salen del tiempo del video.
+  const paint = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const d = Number.isFinite(video.duration) ? video.duration : 0;
+    const i = chapterAt(video.currentTime);
+    if (i !== chapterRef.current) {
+      chapterRef.current = i;
+      setChapter(i);
+    }
+    const from = VIDEO_CHAPTERS[i].t;
+    const to = Math.min(VIDEO_CHAPTERS[i + 1]?.t ?? d, d || Infinity);
+    const k = to > from ? clamp01((video.currentTime - from) / (to - from)) : 0;
+    chipRefs.current.forEach((chip, j) => chip?.style.setProperty('--p', j === i ? k.toFixed(4) : '0'));
+  }, []);
+
+  useEffect(() => {
+    if (!playing) return;
+    let raf = 0;
+    const step = () => {
+      paint();
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, paint]);
+
+  // Al entrar, el marco viene apenas inclinado hacia atrás y se endereza con el primer
+  // 40 % de pantalla de scroll.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    if (reduced) {
+      stage.style.removeProperty('--k');
+      return;
+    }
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      stage.style.setProperty('--k', clamp01(window.scrollY / (window.innerHeight * 0.4)).toFixed(3));
+    };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      cancelAnimationFrame(raf);
+    };
+  }, [reduced]);
+
+  // Las tarjetas flotantes siguen apenas al mouse (paralaje).
+  useEffect(() => {
+    const stage = stageRef.current;
+    const hero = stage?.closest<HTMLElement>('.lp-hero');
+    if (!stage || !hero || reduced) return;
+    let raf = 0;
+    let x = 0;
+    let y = 0;
+    const apply = () => {
+      raf = 0;
+      const r = stage.getBoundingClientRect();
+      const px = Math.max(-1, Math.min(1, (x - (r.left + r.width / 2)) / (r.width / 2)));
+      const py = Math.max(-1, Math.min(1, (y - (r.top + r.height / 2)) / (r.height / 2)));
+      stage.style.setProperty('--px', px.toFixed(3));
+      stage.style.setProperty('--py', py.toFixed(3));
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse') return;
+      x = e.clientX;
+      y = e.clientY;
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+    const onLeave = () => {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      stage.style.setProperty('--px', '0');
+      stage.style.setProperty('--py', '0');
+    };
+    hero.addEventListener('pointermove', onMove);
+    hero.addEventListener('pointerleave', onLeave);
+    return () => {
+      hero.removeEventListener('pointermove', onMove);
+      hero.removeEventListener('pointerleave', onLeave);
+      cancelAnimationFrame(raf);
+    };
+  }, [reduced]);
+
+  const togglePlay = () => setIntent(wantsPlay ? 'pause' : 'play');
+  const toggleSound = () => {
+    // Quien pide sonido quiere ver el video: si estaba en pausa, arranca.
+    if (muted && !wantsPlay) setIntent('play');
+    setMuted((m) => !m);
+  };
+  const seek = (i: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = VIDEO_CHAPTERS[i].t;
+    setIntent('play');
+    paint();
+  };
+
+  const showPoster = !failed && !started && !wantsPlay;
+
+  return (
+    <div className="lp-stage" ref={stageRef}>
+      <div className="lp-stage-main" ref={mainRef}>
+        <div className="lp-frame-wrap">
+          <div className="lp-frame">
+            <div className={`lp-screen${showPoster ? ' is-idle' : ''}`}>
+              <video
+                ref={videoRef}
+                className="lp-video"
+                src={VIDEO_SRC}
+                poster={VIDEO_POSTER}
+                muted
+                playsInline
+                loop
+                preload="metadata"
+                aria-label="Video de daily: del registro del paciente al informe del terapeuta"
+                aria-describedby="lp-video-desc"
+                onClick={failed ? undefined : togglePlay}
+                onPlaying={() => {
+                  setPlaying(true);
+                  setStarted(true);
+                }}
+                onPause={() => setPlaying(false)}
+                onLoadedMetadata={(e) => {
+                  setDuration(Number.isFinite(e.currentTarget.duration) ? e.currentTarget.duration : 0);
+                  paint();
+                }}
+                onSeeked={paint}
+                onError={() => setFailed(true)}
+              />
+              {showPoster && (
+                <button type="button" className="lp-vplay" onClick={() => setIntent('play')}>
+                  <span className="lp-vplay-icon">
+                    <Play aria-hidden />
+                  </span>
+                  Ver el video
+                </button>
+              )}
+              {!failed && (
+                <div className="lp-vctrl">
+                  <button type="button" className="lp-vbtn" onClick={togglePlay} aria-label={wantsPlay ? 'Pausar el video' : 'Reproducir el video'} title={wantsPlay ? 'Pausar' : 'Reproducir'}>
+                    {wantsPlay ? <Pause aria-hidden /> : <Play aria-hidden />}
+                  </button>
+                  <button type="button" className="lp-vbtn" onClick={toggleSound} aria-label="Sonido del video" aria-pressed={!muted} title={muted ? 'Activar el sonido' : 'Silenciar'}>
+                    {muted ? <VolumeX aria-hidden /> : <Volume2 aria-hidden />}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="lp-float is-left" aria-hidden>
+            <div className="lp-float-in">
+              <span className="lp-float-entry">
+                <CategoryAvatar id="movimiento" />
+                <span>
+                  <b>Caminata por el parque</b>
+                  <small>18:30 · Actividad física</small>
+                </span>
+              </span>
+              <Scores pleasure={9} control={8} />
+            </div>
+          </div>
+          <div className="lp-float is-right" aria-hidden>
+            <div className="lp-float-in">
+              <small>Constancia</small>
+              <span className="lp-float-cons">
+                <b>86%</b>
+                <span>6 de 7 días</span>
+              </span>
+              <span className="lp-segs">
+                {WEEK.map(([d, p]) => (
+                  <i key={d} className={p == null ? 'is-off' : ''} />
+                ))}
+              </span>
+            </div>
+          </div>
+        </div>
+        {!failed && (
+          <div className="lp-chapters" role="group" aria-label="Capítulos del video">
+            {VIDEO_CHAPTERS.map((c, i) => (
+              <button
+                key={c.label}
+                type="button"
+                ref={(el) => {
+                  chipRefs.current[i] = el;
+                }}
+                className={`lp-chapter${i === chapter ? ' is-active' : ''}`}
+                aria-current={i === chapter ? 'true' : undefined}
+                disabled={duration > 0 && c.t >= duration}
+                onClick={() => seek(i)}
+              >
+                <span className="lp-chapter-fill" aria-hidden />
+                <span className="lp-chapter-label">{c.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <p className="sr-only" id="lp-video-desc">
+        El video muestra daily en uso: una paciente carga una actividad con horario, categoría y puntajes de placer y
+        control; repasa su semana; cuenta un día a la IA, que lo ordena para que lo revise antes de guardar; su terapeuta
+        abre el informe semanal con promedios, constancia y un gráfico por día; y crea un link para invitar a un paciente.
+        No tiene narración.
+      </p>
+    </div>
+  );
+}
+
+// La semana de ejemplo (placer y control promedio por día; null = sin registros).
 const WEEK: [string, number | null, number | null][] = [
   ['Lun', 5.3, 6.4],
   ['Mar', null, null],
@@ -349,212 +694,7 @@ const WEEK: [string, number | null, number | null][] = [
   ['Dom', 6.8, 6.5],
 ];
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-const easeOut = (k: number) => 1 - Math.pow(1 - clamp01(k), 3);
 const fmt1 = (v: number) => v.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-
-function HeroPreview() {
-  const reduced = useReducedMotion();
-  const [stageRef, visible] = useInView<HTMLDivElement>(false, '0px');
-  const [t, setT] = useState(reduced ? 4.9 : 0);
-  const [paused, setPaused] = useState(false);
-  const tiltRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (reduced || paused || !visible) return;
-    let raf = 0;
-    let last = performance.now();
-    const step = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      setT((v) => (v + dt) % LOOP);
-      raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [reduced, paused, visible]);
-
-  const view = t < SWITCH ? 'patient' : 'therapist';
-  const go = (v: 'patient' | 'therapist') => setT(v === 'patient' ? (reduced ? 4.9 : 0) : reduced ? 9.4 : SWITCH);
-
-  function onTilt(e: ReactPointerEvent<HTMLDivElement>) {
-    const el = tiltRef.current;
-    if (!el || reduced || e.pointerType !== 'mouse') return;
-    const r = el.getBoundingClientRect();
-    const px = (e.clientX - r.left) / r.width - 0.5;
-    const py = (e.clientY - r.top) / r.height - 0.5;
-    el.style.setProperty('--rx', `${(-py * 5).toFixed(2)}deg`);
-    el.style.setProperty('--ry', `${(px * 6).toFixed(2)}deg`);
-    spotlight(e);
-  }
-  function endTilt() {
-    tiltRef.current?.style.setProperty('--rx', '0deg');
-    tiltRef.current?.style.setProperty('--ry', '0deg');
-  }
-
-  const tabsRef = useRef<HTMLDivElement>(null);
-  const [thumb, setThumb] = useState({ x: 0, w: 0 });
-  useLayoutEffect(() => {
-    const btn = tabsRef.current?.querySelector<HTMLElement>(`button[data-view="${view}"]`);
-    if (btn) setThumb({ x: btn.offsetLeft, w: btn.offsetWidth });
-  }, [view]);
-
-  return (
-    <div
-      className="lp-preview"
-      ref={stageRef}
-      onPointerEnter={() => setPaused(true)}
-      onPointerLeave={() => {
-        setPaused(false);
-        endTilt();
-      }}
-      onPointerMove={onTilt}
-      onFocus={() => setPaused(true)}
-      onBlur={() => setPaused(false)}
-    >
-      <div className="lp-preview-tabs" ref={tabsRef} role="tablist" aria-label="Vista del ejemplo">
-        <span className="lp-preview-thumb" style={{ transform: `translateX(${thumb.x}px)`, width: thumb.w }} aria-hidden />
-        <button type="button" role="tab" data-view="patient" aria-selected={view === 'patient'} onClick={() => go('patient')}>
-          Paciente
-        </button>
-        <button type="button" role="tab" data-view="therapist" aria-selected={view === 'therapist'} onClick={() => go('therapist')}>
-          Terapeuta
-        </button>
-      </div>
-      <div className="lp-device" ref={tiltRef}>
-        <div className="lp-device-bar" aria-hidden>
-          <i />
-          <i />
-          <i />
-          <span>daily-nine-ruddy.vercel.app</span>
-        </div>
-        <div className="lp-device-screen" aria-hidden>
-          {view === 'patient' ? <PatientScene t={t} /> : <TherapistScene t={t - SWITCH} />}
-        </div>
-        <span className={`lp-preview-state${paused && !reduced ? ' is-on' : ''}`} aria-hidden>
-          Pausado
-        </span>
-        <div className="lp-progress" aria-hidden>
-          <i style={{ transform: `scaleX(${(t / LOOP).toFixed(4)})` }} />
-        </div>
-      </div>
-      <p className="sr-only">
-        Ejemplo: la paciente escribe "{SENTENCE}" La IA lo ordena en la actividad Caminata por el parque, 18:30, actividad
-        física, placer 9 y control 8. En el informe semanal, la terapeuta ve placer 5,3, control 5,9 y constancia 86 %.
-      </p>
-    </div>
-  );
-}
-
-function PatientScene({ t }: { t: number }) {
-  const typed = SENTENCE.slice(0, Math.floor(clamp01((t - 0.3) / 1.75) * SENTENCE.length));
-  const sent = t >= 2.25;
-  const thinking = t >= 2.6 && t < 3.3;
-  const card = easeOut((t - 3.3) / 0.45);
-  const saved = t >= 4.55;
-  return (
-    <div className="lp-scene lp-scene-patient">
-      <div className="lp-chat-head">
-        <span className="lp-chat-av">
-          <Sparkles />
-        </span>
-        <div>
-          <b>Contale tu día</b>
-          <small>Lo ordeno en actividades y vos revisás antes de guardar.</small>
-        </div>
-      </div>
-      <div className="lp-chat-body">
-        {sent && <div className="lp-bubble is-user lp-pop">{SENTENCE}</div>}
-        {thinking && (
-          <div className="lp-bubble is-ai lp-pop">
-            Ordenando tu día<span className="lp-dots"><i /><i /><i /></span>
-          </div>
-        )}
-        {card > 0 && (
-          <div className="lp-proposal" style={{ opacity: card, transform: `translateY(${((1 - card) * 14).toFixed(1)}px) scale(${(0.97 + 0.03 * card).toFixed(3)})` }}>
-            <div className="lp-proposal-row">
-              <CategoryAvatar id="movimiento" />
-              <div className="lp-proposal-text">
-                <b>Caminata por el parque</b>
-                <small>18:30 · Actividad física</small>
-              </div>
-              <span className={`lp-check${saved ? ' is-on' : ''}`}>
-                <Check />
-              </span>
-            </div>
-            <div className="lp-proposal-foot">
-              <Scores pleasure={9} control={8} compact />
-              <span className={`lp-add${saved ? ' is-saved' : ''}`}>{saved ? 'Guardado en tu día' : 'Agregar al día'}</span>
-            </div>
-          </div>
-        )}
-      </div>
-      <div className="lp-composer">
-        <span className={typed && !sent ? '' : 'is-ph'}>
-          {sent ? '¿Cómo fue tu miércoles?' : typed || '¿Cómo fue tu miércoles?'}
-          {!sent && t >= 0.3 && <i className="lp-caret" />}
-        </span>
-        <span className={`lp-send${t >= 2.15 && t < 2.45 ? ' is-pressed' : ''}`}>
-          <ArrowRight />
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function TherapistScene({ t }: { t: number }) {
-  const k = easeOut((t - 0.15) / 1.1);
-  return (
-    <div className="lp-scene lp-scene-therapist">
-      <div className="lp-rep-head">
-        <small>Informe semanal</small>
-        <b>Martina Ruiz</b>
-      </div>
-      <div className="lp-rep-stats">
-        <div className="lp-rep-hero">
-          <span>Placer</span>
-          <b>{fmt1(5.3 * k)}</b>
-          <span>Control</span>
-          <b>{fmt1(5.9 * k)}</b>
-        </div>
-        <div className="lp-rep-cons">
-          <span>Constancia</span>
-          <b>{Math.round(86 * k)}%</b>
-          <div className="lp-segs">
-            {WEEK.map(([d, p], i) => (
-              <i key={d} className={p == null ? 'is-off' : ''} style={{ transform: `scaleX(${p == null ? 1 : easeOut((t - 0.3 - i * 0.07) / 0.5).toFixed(3)})` }} />
-            ))}
-          </div>
-        </div>
-      </div>
-      <div className="lp-rep-chart">
-        {WEEK.map(([d, p, c], i) => {
-          const g = Math.max(0, easeOut((t - 0.4 - i * 0.09) / 0.6));
-          const focus = d === 'Sáb' && t > 2.1 && t < 4.2;
-          return (
-            <div key={d} className={`lp-rep-day${focus ? ' is-focus' : ''}`}>
-              <div className="lp-rep-bars">
-                {p == null ? (
-                  <span className="lp-rep-empty" />
-                ) : (
-                  <>
-                    <i style={{ height: `${(p * 10 * g).toFixed(1)}%`, background: 'var(--pleasure)' }} />
-                    <i style={{ height: `${((c ?? 0) * 10 * g).toFixed(1)}%`, background: 'var(--control)' }} />
-                  </>
-                )}
-                {focus && (
-                  <span className="lp-tip">
-                    Placer {fmt1(p ?? 0)} · Control {fmt1(c ?? 0)}
-                  </span>
-                )}
-              </div>
-              <small>{d}</small>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 // ─────────────────────────────── base clínica ───────────────────────────────
 
@@ -610,9 +750,12 @@ function HowItWorks() {
           </Reveal>
           <Reveal as="li" i={1} className="lp-step">
             <span className="lp-step-n">2</span>
-            <DictateArt />
-            <h3>Tu paciente cuenta su día</h3>
-            <p>Lo escribe o lo dicta. La IA lo ordena en actividades con horario y puntajes, y tu paciente revisa antes de guardar.</p>
+            <EntryArt />
+            <h3>Tu paciente registra su día</h3>
+            <p>
+              Carga cada actividad con horario, qué hizo, categoría y puntajes de placer y control, y cómo se sintió en el día.
+              Si prefiere, se lo cuenta a la IA y revisa antes de guardar.
+            </p>
           </Reveal>
           <Reveal as="li" i={2} className="lp-step">
             <span className="lp-step-n">3</span>
@@ -632,7 +775,7 @@ function InviteArt() {
     <div className={`lp-art lp-art-invite${inView ? ' is-in' : ''}`} ref={ref} aria-hidden>
       <span className="lp-invite-link">
         <Link2 />
-        <span>daily…/invitacion/K7Q2</span>
+        <span>invitacion/K7Q2</span>
       </span>
       <span className="lp-invite-copy">
         <span className="a">Copiar</span>
@@ -644,18 +787,23 @@ function InviteArt() {
   );
 }
 
-function DictateArt() {
+/** Una actividad cargada a mano: aparece y se marca como guardada. */
+function EntryArt() {
+  const [ref, inView] = useInView<HTMLDivElement>(true, '0px 0px -20% 0px');
   return (
-    <div className="lp-art lp-art-dictate" aria-hidden>
-      <span className="lp-mic">
-        <i />
-        <i />
-        <Mic />
-      </span>
-      <span className="lp-wave">
-        {Array.from({ length: 14 }, (_, i) => (
-          <i key={i} style={{ ['--i' as string]: i } as CSSProperties} />
-        ))}
+    <div className={`lp-art lp-art-entry${inView ? ' is-in' : ''}`} ref={ref} aria-hidden>
+      <span className="lp-entry">
+        <span className="lp-entry-row">
+          <CategoryAvatar id="movimiento" />
+          <span className="lp-entry-text">
+            <b>Caminata por el parque</b>
+            <small>18:30 · Actividad física</small>
+          </span>
+          <span className="lp-entry-check">
+            <Check />
+          </span>
+        </span>
+        <Scores pleasure={9} control={8} />
       </span>
     </div>
   );
@@ -684,7 +832,7 @@ function Features() {
         <SectionHead
           kicker="Funciones"
           title={<span id="lp-feat-title">Todo lo que necesitás para seguir la semana.</span>}
-          sub="Lo mismo que usan tus pacientes y vos, sin pasos de más."
+          sub="Lo que carga tu paciente cada día y lo que ves vos antes de la sesión."
         />
         <div className="lp-bento">
           <Reveal i={0} className="lp-card lp-card-wide">
@@ -694,22 +842,22 @@ function Features() {
           </Reveal>
           <Reveal i={1} className="lp-card">
             <div onPointerMove={spotlight} className="lp-card-in">
-              <ChatCard />
+              <ReportCard />
             </div>
           </Reveal>
           <Reveal i={2} className="lp-card">
             <div onPointerMove={spotlight} className="lp-card-in">
-              <ReportCard />
+              <ConsCard />
             </div>
           </Reveal>
           <Reveal i={3} className="lp-card">
             <div onPointerMove={spotlight} className="lp-card-in">
-              <ConsCard />
+              <SessionCard />
             </div>
           </Reveal>
           <Reveal i={4} className="lp-card">
             <div onPointerMove={spotlight} className="lp-card-in">
-              <SessionCard />
+              <ChatCard />
             </div>
           </Reveal>
         </div>
@@ -731,7 +879,10 @@ function RatingCard() {
           <ChartColumn aria-hidden />
         </span>
         <h3>Placer y control, del 1 al 10</h3>
-        <p>Los dos puntajes de cada actividad. Probalo: tocá la escala.</p>
+        <p>
+          Tu paciente carga cada actividad con horario, categoría y estos dos puntajes, y puede sumar notas y cómo se
+          sintió en el día. Probalo: tocá la escala.
+        </p>
       </div>
       <div className="lp-rating-demo">
         <RatingScale scale="pleasure" value={pleasure} onChange={setPleasure} />
@@ -753,32 +904,33 @@ function RatingCard() {
 
 const CHAT_TEXT = 'Dormí mal y me levanté tarde, tipo 11. A la tarde salí a caminar y me ayudó un poco.';
 
+// Escribe el ejemplo una sola vez al verse por primera vez, y queda quieto.
 function ChatCard() {
   const reduced = useReducedMotion();
   const [ref, visible] = useInView<HTMLDivElement>(false, '0px');
   const [n, setN] = useState(reduced ? CHAT_TEXT.length : 0);
+  const done = reduced || n >= CHAT_TEXT.length;
   useEffect(() => {
-    if (reduced || !visible) return;
-    const id = window.setInterval(() => setN((v) => (v >= CHAT_TEXT.length + 40 ? 0 : v + 1)), 42);
+    if (done || !visible) return;
+    const id = window.setInterval(() => setN((v) => Math.min(v + 1, CHAT_TEXT.length)), 42);
     return () => window.clearInterval(id);
-  }, [reduced, visible]);
-  const shown = CHAT_TEXT.slice(0, Math.min(n, CHAT_TEXT.length));
+  }, [done, visible]);
   return (
     <div ref={ref} className="lp-fill">
       <div className="lp-card-copy">
         <span className="lp-card-icon is-green">
           <Mic aria-hidden />
         </span>
-        <h3>Contale tu día</h3>
-        <p>Escrito o dictado, como le salga. La IA lo ordena y tu paciente revisa antes de guardar.</p>
+        <h3>Si prefiere, se lo cuenta a la IA</h3>
+        <p>Escrito o dictado, como le salga. La IA lo ordena en actividades y tu paciente revisa antes de guardar. Es opcional.</p>
       </div>
       <div className="lp-mini-chat" aria-hidden>
         <span className="lp-mini-mic">
           <Mic />
         </span>
         <span className="lp-mini-text">
-          {shown}
-          <i className="lp-caret" />
+          {done ? CHAT_TEXT : CHAT_TEXT.slice(0, n)}
+          {!done && <i className="lp-caret" />}
         </span>
       </div>
     </div>
@@ -906,11 +1058,11 @@ const VIEWS = {
   },
   patient: {
     label: 'Para tus pacientes',
-    title: 'Registrar el día deja de ser una tarea.',
+    title: 'Registrar el día se vuelve simple.',
     points: [
-      'Cuentan su día con sus palabras, escrito o dictado.',
-      'La IA lo ordena; ellos revisan y guardan.',
-      'También pueden cargar cada actividad a mano.',
+      'Cargan cada actividad con horario, qué hicieron, categoría y puntajes.',
+      'Suman notas y cómo se sintieron en el día.',
+      'Si prefieren, se lo cuentan a la IA, escrito o dictado, y revisan antes de guardar.',
       'Funciona en el celular, sin instalar nada.',
     ],
   },
@@ -931,10 +1083,11 @@ function TwoViews() {
         <div>
           <SectionHead kicker="Dos vistas" title={<span id="lp-views-title">Una herramienta, dos lados de la terapia.</span>} />
           <Reveal i={2}>
-            <div className="lp-switch" ref={tabsRef} role="tablist" aria-label="Elegí una vista">
+            {/* Botones de un grupo (como el selector de la app), no pestañas. */}
+            <div className="lp-switch" ref={tabsRef} role="group" aria-label="Elegí una vista">
               <span className="lp-switch-thumb" data-view={view} style={{ transform: `translateX(${thumb.x}px)`, width: thumb.w }} aria-hidden />
               {(['therapist', 'patient'] as const).map((v) => (
-                <button key={v} type="button" role="tab" data-view={v} aria-selected={view === v} aria-controls="lp-views-panel" onClick={() => setView(v)}>
+                <button key={v} type="button" data-view={v} aria-pressed={view === v} aria-controls="lp-views-panel" onClick={() => setView(v)}>
                   {VIEWS[v].label}
                 </button>
               ))}
@@ -942,7 +1095,7 @@ function TwoViews() {
           </Reveal>
         </div>
         <Reveal i={3}>
-          <div className={`lp-views-panel is-${view}`} id="lp-views-panel" role="tabpanel" key={view}>
+          <div className={`lp-views-panel is-${view}`} id="lp-views-panel" key={view}>
             <span className="lp-views-icon">{view === 'therapist' ? <Users aria-hidden /> : <Smartphone aria-hidden />}</span>
             <h3>{data.title}</h3>
             <ul>
@@ -967,10 +1120,20 @@ function TwoViews() {
 
 function Privacy() {
   const points = [
-    ['Cada registro lo ven solo tu paciente y vos.', 'Las reglas de acceso están en la base de datos, no solo en la pantalla.'],
+    ['Los registros guardados los ven solo tu paciente y vos.', 'Las reglas de acceso están en la base de datos, no solo en la pantalla.'],
     ['Tu paciente decide sobre sus datos.', 'Puede descargar sus registros o borrar su cuenta cuando quiera.'],
-    ['Podés desvincular a un paciente.', 'Dejás de ver sus registros y se borran tus notas sobre esa persona.'],
-    ['La IA solo ordena el texto.', 'No da consejos ni diagnósticos, y nada se guarda sin que tu paciente lo revise.'],
+    [
+      'Cualquiera de los dos puede terminar el vínculo.',
+      'Si vos o tu paciente lo terminan, o tu paciente borra su cuenta, dejás de ver sus registros y se borran tus notas sobre esa persona.',
+    ],
+    [
+      'La IA es opcional y solo ordena el texto.',
+      'No da consejos clínicos ni diagnósticos, y nada queda en los registros sin que tu paciente lo revise.',
+    ],
+    [
+      'Qué pasa por servicios externos.',
+      'Si tu paciente usa el chat, el texto se envía a Groq (EE. UU.) para ordenarlo; Groq no lo usa para entrenar modelos. El dictado usa el reconocimiento de voz del navegador (en Chrome, el de Google). Si carga todo a mano, no pasa por ninguno de los dos.',
+    ],
   ] as const;
   return (
     <section className="lp-section lp-section-dark" id="privacidad" aria-labelledby="lp-priv-title">
@@ -1016,7 +1179,7 @@ function AccessArt() {
       <span className="lp-access-out">
         <span className="lp-access-node is-other">
           <b>?</b>
-          <small>Nadie más</small>
+          <small>Otros usuarios</small>
         </span>
       </span>
     </div>
@@ -1025,16 +1188,31 @@ function AccessArt() {
 
 // ─────────────────────────────── preguntas ───────────────────────────────
 
+// La primera pregunta abre sola: cómo carga su día el paciente (lo central de daily).
 const FAQS = [
+  [
+    '¿Cómo carga su día mi paciente?',
+    'Desde el celular o la compu, suma cada actividad con horario, qué hizo, categoría y puntajes de placer y control del 1 al 10. También puede anotar comentarios y cómo se sintió en el día. Si prefiere, se lo cuenta a la IA, escrito o dictado, y revisa antes de guardar.',
+  ],
+  ['¿Cuánto cuesta?', 'Por ahora es gratis, para vos y para tus pacientes.'],
   ['¿Mis pacientes tienen que instalar algo?', 'No. daily funciona en el navegador, en el celular o en la compu. Entran con el link de invitación que les mandás.'],
   [
-    '¿Qué hace exactamente la IA?',
-    'Ordena lo que tu paciente cuenta en actividades con horario, categoría y, si los dijo, puntajes de placer y control. No inventa datos ni da consejos clínicos, y tu paciente revisa todo antes de guardarlo.',
+    '¿Qué hace la IA? ¿Es obligatoria?',
+    'Es opcional. Si tu paciente prefiere contar su día con sus palabras, la IA lo ordena en actividades con horario, categoría y, si los dijo, puntajes de placer y control. No da consejos clínicos ni diagnósticos, y tu paciente revisa todo antes de guardarlo. Si la IA no está disponible, el chat sigue en un modo básico que reconoce horarios y categorías, y siempre se puede cargar a mano.',
   ],
-  ['¿Y si mi paciente no quiere usar la IA?', 'Puede cargar cada actividad a mano, con horario, categoría y puntajes.'],
-  ['¿Quién puede ver los registros?', 'Solo tu paciente y vos. Si desvinculás a un paciente, dejás de ver sus registros.'],
+  [
+    '¿Quién puede ver los registros?',
+    'Los registros guardados, solo tu paciente y vos. El texto del chat pasa por el proveedor de IA para ordenarse, sin quedar guardado en daily. Si vos o tu paciente terminan el vínculo, dejás de ver sus registros y se borran tus notas de sesión.',
+  ],
+  [
+    '¿Me avisa si mi paciente escribe algo de riesgo?',
+    'No. daily no es un canal de urgencias ni se revisa en tiempo real: ves lo que tu paciente guarda cuando abrís su informe. Acordá con cada paciente cómo contactarte, o a quién recurrir, si lo necesita.',
+  ],
   ['¿Puedo tener varios pacientes?', 'Sí. Cada paciente tiene su informe semanal y su historial de semanas.'],
-  ['¿Lo puedo probar sin crear una cuenta?', 'Sí. La demo te muestra la vista del paciente y la del terapeuta con datos de ejemplo, sin registrarte.'],
+  [
+    '¿Lo puedo probar sin crear una cuenta?',
+    'Sí. La demo te muestra la vista del paciente y la del terapeuta con datos de ejemplo, sin registrarte. En la demo, el chat usa el modo básico, sin IA.',
+  ],
 ] as const;
 
 function Faq() {
@@ -1078,7 +1256,7 @@ function FinalCta() {
           <span className="lp-final-orbit" aria-hidden />
           <span className="lp-final-orbit is-2" aria-hidden />
           <h2 id="lp-final-title">Empezá con tu próximo paciente.</h2>
-          <p>Creás tu cuenta, invitás a tu paciente y la semana que viene ya tenés su informe.</p>
+          <p>Creás tu cuenta gratis, invitás a tu paciente y la semana que viene ya tenés su informe.</p>
           <div className="lp-final-ctas">
             <CtaButton variant="light" onClick={() => navigate('crear-cuenta')}>
               Crear cuenta de terapeuta

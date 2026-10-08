@@ -33,7 +33,7 @@ const MIN_PASSWORD = 8;
 const POINTS: Record<Role, [LucideIcon, string][]> = {
   patient: [
     [NotebookPen, 'Registrá tus actividades con placer y control, del 1 al 10.'],
-    [Sparkles, 'Contale tu día a la IA y lo ordena por vos.'],
+    [Sparkles, 'Si preferís, contale tu día a la IA y lo ordena por vos.'],
     [LockKeyhole, 'Solo vos y tu terapeuta pueden ver tus registros.'],
   ],
   therapist: [

@@ -162,3 +162,28 @@ export function markOnboardingSeen() {
     // Sin almacenamiento: la presentación vuelve a aparecer la próxima vez.
   }
 }
+
+// ─────────── Cuenta usada en este navegador ───────────
+
+const ACCOUNT_KEY = 'daily.cuenta.v1';
+// Respaldo para cuando el navegador no deja guardar: vale mientras la página siga abierta.
+let hadSessionInMemory = false;
+
+/** Si alguna vez hubo una sesión iniciada en este navegador (quien vuelve va al ingreso, no a la landing). */
+export function hadSessionHere(): boolean {
+  if (hadSessionInMemory) return true;
+  try {
+    return localStorage.getItem(ACCOUNT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markHadSession() {
+  hadSessionInMemory = true;
+  try {
+    localStorage.setItem(ACCOUNT_KEY, '1');
+  } catch {
+    // Sin almacenamiento: la próxima vez se ve la landing, y "Ingresar" está en la barra.
+  }
+}
