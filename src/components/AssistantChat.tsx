@@ -94,7 +94,7 @@ export function AssistantChat({
   messages: ChatMessage[];
   onMessages: (update: (prev: ChatMessage[]) => ChatMessage[]) => void;
   onClose?: () => void;
-  /** Oculta el asistente (vuelve desde Ajustes). */
+  /** Oculta el asistente (vuelve con el botón de abajo a la derecha o desde Ajustes). */
   onHide: () => void;
   onAdded: (count: number) => void;
 }) {

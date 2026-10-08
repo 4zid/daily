@@ -220,7 +220,7 @@ export function PatientApp({
     tile?.focus({ preventScroll: true });
     // Con teclado, que el foco quede a la vista (con mouse la página no salta).
     if (tile?.matches(':focus-visible')) tile.scrollIntoView({ block: 'center' });
-    notify('Ocultaste el asistente.', {
+    notify('Ocultaste el asistente. Para volver a verlo, usá el botón de abajo a la derecha.', {
       label: 'Deshacer',
       run: () => {
         local.setAssistant(true);
@@ -230,6 +230,20 @@ export function PatientApp({
           document.querySelector<HTMLElement>('.assistant-col [aria-label="Ocultar asistente"]')?.focus(),
         );
       },
+    });
+  }
+
+  /** Vuelve a mostrar el asistente desde el botón que queda en su lugar (igual que Ajustes → Visible). */
+  function showAssistant() {
+    local.setAssistant(true);
+    // Donde el chat es un panel flotante o una hoja (mismo corte que en styles.css), además se abre.
+    if (window.matchMedia('(max-width: 1320px)').matches) setSheetOpen(true);
+    // El botón se va: el foco pasa al panel, al cuadro para escribir (o a su botón de ocultar).
+    requestAnimationFrame(() => {
+      const panel = document.querySelector('.assistant-col');
+      const target =
+        panel?.querySelector<HTMLElement>('textarea') ?? panel?.querySelector<HTMLElement>('[aria-label="Ocultar asistente"]');
+      target?.focus({ preventScroll: true });
     });
   }
 
@@ -397,6 +411,20 @@ export function PatientApp({
             </button>
           )}
         </>
+      )}
+
+      {/* Con el asistente oculto, queda un botón chico donde estaba para volver a mostrarlo. */}
+      {view === 'registro' && !assistant && (
+        <button
+          type="button"
+          className="assistant-reshow"
+          onClick={showAssistant}
+          aria-label="Mostrar asistente de IA"
+          title="Mostrar asistente de IA"
+        >
+          <Sparkles aria-hidden />
+          <span className="assistant-reshow-text">Asistente</span>
+        </button>
       )}
 
       <SettingsDialog
