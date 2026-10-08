@@ -13,6 +13,8 @@ export type Theme = 'system' | 'light' | 'dark';
 interface LocalData {
   days: Record<string, DayLog>;
   theme: Theme;
+  /** Si se muestra el asistente de IA del paciente (se puede ocultar y cargar todo a mano). */
+  assistant: boolean;
 }
 
 export function newId(): string {
@@ -73,15 +75,17 @@ export function sanitizeDays(raw: unknown): Record<string, DayLog> {
 function load(): LocalData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { days: {}, theme: 'system' };
-    const parsed = JSON.parse(raw) as { days?: unknown; settings?: { theme?: Theme } };
+    if (!raw) return { days: {}, theme: 'system', assistant: true };
+    const parsed = JSON.parse(raw) as { days?: unknown; settings?: { theme?: Theme; assistant?: boolean } };
     const theme = parsed.settings?.theme;
     return {
       days: sanitizeDays(parsed.days),
       theme: theme === 'light' || theme === 'dark' ? theme : 'system',
+      // Los datos de antes no tienen este ajuste: el asistente se ve.
+      assistant: parsed.settings?.assistant !== false,
     };
   } catch {
-    return { days: {}, theme: 'system' };
+    return { days: {}, theme: 'system', assistant: true };
   }
 }
 
@@ -91,7 +95,10 @@ const listeners = new Set<() => void>();
 function setState(next: LocalData) {
   state = next;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, days: next.days, settings: { theme: next.theme } }));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ version: 2, days: next.days, settings: { theme: next.theme, assistant: next.assistant } }),
+    );
   } catch {
     // Sin almacenamiento disponible (modo privado): la app sigue en memoria.
   }
@@ -110,6 +117,9 @@ export function useLocal(): LocalData {
 export const local = {
   setTheme(theme: Theme) {
     setState({ ...state, theme });
+  },
+  setAssistant(assistant: boolean) {
+    setState({ ...state, assistant });
   },
   /** Borra los registros del navegador (después de subirlos a la cuenta). */
   clearDays() {
