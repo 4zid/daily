@@ -25,6 +25,9 @@ import { TherapistView } from './TherapistView';
 import { WeekList, mergeWeeks } from './WeekList';
 import { Brand, Modal, Toast, type ToastState } from './common';
 
+/** Aviso al ocultar el asistente: enseña el camino de vuelta. */
+const HIDDEN_NOTICE = 'Ocultaste el asistente. Para volver a verlo, usá el botón de abajo a la derecha.';
+
 export function PatientApp({
   profile,
   path,
@@ -209,6 +212,8 @@ export function PatientApp({
     }
     setSheetOpen(false);
     local.setAssistant(shown);
+    // Al volver a mostrarlo, el aviso de que se ocultó ya no aplica (y taparía el chat). Otro aviso se queda.
+    if (shown) setToast((t) => (t?.text === HIDDEN_NOTICE ? null : t));
     return true;
   }
 
@@ -220,7 +225,7 @@ export function PatientApp({
     tile?.focus({ preventScroll: true });
     // Con teclado, que el foco quede a la vista (con mouse la página no salta).
     if (tile?.matches(':focus-visible')) tile.scrollIntoView({ block: 'center' });
-    notify('Ocultaste el asistente. Para volver a verlo, usá el botón de abajo a la derecha.', {
+    notify(HIDDEN_NOTICE, {
       label: 'Deshacer',
       run: () => {
         local.setAssistant(true);
@@ -235,7 +240,7 @@ export function PatientApp({
 
   /** Vuelve a mostrar el asistente desde el botón que queda en su lugar (igual que Ajustes → Visible). */
   function showAssistant() {
-    local.setAssistant(true);
+    setAssistant(true);
     // Donde el chat es un panel flotante o una hoja (mismo corte que en styles.css), además se abre.
     if (window.matchMedia('(max-width: 1320px)').matches) setSheetOpen(true);
     // El botón se va: el foco pasa al panel, al cuadro para escribir (o a su botón de ocultar).
