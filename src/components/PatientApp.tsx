@@ -215,12 +215,19 @@ export function PatientApp({
     const wasOpen = sheetOpen;
     if (!setAssistant(false)) return;
     // El botón se va con el panel: el foco pasa al día elegido, en la columna principal.
-    document.querySelector<HTMLElement>('.day-tile[aria-pressed="true"]')?.focus({ preventScroll: true });
+    const tile = document.querySelector<HTMLElement>('.day-tile[aria-pressed="true"]');
+    tile?.focus({ preventScroll: true });
+    // Con teclado, que el foco quede a la vista (con mouse la página no salta).
+    if (tile?.matches(':focus-visible')) tile.scrollIntoView({ block: 'center' });
     notify('Ocultaste el asistente.', {
       label: 'Deshacer',
       run: () => {
         local.setAssistant(true);
         setSheetOpen(wasOpen);
+        // El panel vuelve: el foco va a su botón de ocultar.
+        requestAnimationFrame(() =>
+          document.querySelector<HTMLElement>('.assistant-col [aria-label="Ocultar asistente"]')?.focus(),
+        );
       },
     });
   }
