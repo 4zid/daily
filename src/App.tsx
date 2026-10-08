@@ -6,13 +6,14 @@ import { hasSeenOnboarding, markOnboardingSeen, useLocal } from './lib/store';
 import { AuthScreen } from './components/AuthScreen';
 import { DemoApp } from './components/DemoApp';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { Landing } from './components/Landing';
 import { Onboarding } from './components/Onboarding';
 import { PatientApp } from './components/PatientApp';
 import { TherapistApp } from './components/TherapistApp';
 import { Brand } from './components/common';
 
-// Rutas: "#/bienvenida" (presentación), "#/demo/…" (demo como invitado),
-// "#/ingresar", "#/crear-cuenta", "#/invitacion/CÓDIGO", y las de la app.
+// Rutas: "/" sin sesión es la landing; "#/bienvenida" (presentación), "#/demo/…" (demo como
+// invitado), "#/ingresar", "#/crear-cuenta", "#/invitacion/CÓDIGO", y las de la app.
 
 export default function App() {
   const path = useHashPath();
@@ -62,6 +63,8 @@ function Screens({ path }: { path: string }) {
   if (path === 'bienvenida' && auth.status !== 'recovery') return <Onboarding signedIn={signedIn} />;
 
   if (auth.status === 'signed-out' || auth.status === 'recovery') {
+    // La puerta de entrada pública: quien llega sin sesión ve la landing.
+    if (path === '' && auth.status === 'signed-out') return <Landing />;
     const inviteCode = inviteCodeFrom(path);
     const explicit = path === 'ingresar' || path === 'crear-cuenta';
     if (!inviteCode && !explicit && auth.status === 'signed-out' && !hasSeenOnboarding()) return <Onboarding />;
