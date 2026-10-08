@@ -20,6 +20,11 @@ const THEMES = [
   ['dark', 'Oscuro'],
 ] as const;
 
+const ASSISTANT = [
+  [true, 'Visible'],
+  [false, 'Oculto'],
+] as const;
+
 /** Acciones de la demo que se ofrecen en los ajustes y en la barra de la demo. */
 export interface DemoControls {
   onReset: () => void;
@@ -30,12 +35,14 @@ export interface DemoControls {
 interface SettingsProps {
   open: boolean;
   profile: Profile;
-  /** En la demo no hay cuenta: solo tema, reiniciar y salir. */
+  /** En la demo no hay cuenta: solo tema, asistente, reiniciar y salir. */
   demo?: DemoControls;
   /** Paciente: nombre del terapeuta vinculado (null si no hay). */
   therapistName?: string | null;
   /** Paciente: deja de compartir el registro con su terapeuta. */
   onEndLink?: () => Promise<void>;
+  /** Paciente: muestra u oculta el asistente de IA. */
+  onAssistant?: (shown: boolean) => void;
   onClose: () => void;
   onToast: (text: string) => void;
 }
@@ -60,7 +67,25 @@ function ThemePicker() {
   );
 }
 
-function DemoSettings({ open, demo, onClose }: SettingsProps & { demo: DemoControls }) {
+function AssistantPicker({ onChange }: { onChange: (shown: boolean) => void }) {
+  const { assistant } = useLocal();
+  const hintId = useId();
+  return (
+    <div className="modal-section">
+      <h3>Asistente de IA</h3>
+      <p id={hintId}>Muestra el chat para contarle tu día a la IA. Cargar a mano funciona igual.</p>
+      <div className="segmented" role="group" aria-label="Asistente de IA" aria-describedby={hintId}>
+        {ASSISTANT.map(([value, label]) => (
+          <button key={label} type="button" aria-pressed={assistant === value} onClick={() => onChange(value)}>
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DemoSettings({ open, demo, onAssistant, onClose }: SettingsProps & { demo: DemoControls }) {
   return (
     <Modal open={open} title="Ajustes" onClose={onClose}>
       <div className="modal-section">
@@ -87,11 +112,12 @@ function DemoSettings({ open, demo, onClose }: SettingsProps & { demo: DemoContr
         </div>
       </div>
       <ThemePicker />
+      {onAssistant && <AssistantPicker onChange={onAssistant} />}
     </Modal>
   );
 }
 
-function AccountSettings({ open, profile, therapistName, onEndLink, onClose, onToast }: SettingsProps) {
+function AccountSettings({ open, profile, therapistName, onEndLink, onAssistant, onClose, onToast }: SettingsProps) {
   const auth = useAuth();
   const ids = useId();
   const isPatient = profile.role === 'patient';
@@ -215,6 +241,8 @@ function AccountSettings({ open, profile, therapistName, onEndLink, onClose, onT
       )}
 
       <ThemePicker />
+
+      {isPatient && onAssistant && <AssistantPicker onChange={onAssistant} />}
 
       {isPatient && (
         <div className="modal-section">

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowUp, Check, LifeBuoy, Mic, PenLine, Plus, Sparkles, X } from 'lucide-react';
+import { ArrowUp, Check, EyeOff, LifeBuoy, Mic, PenLine, Plus, Sparkles, X } from 'lucide-react';
 import type { DayLog } from '../types';
 import { getCategory, moodInfo } from '../lib/categories';
 import { longDate, parseISODate, weekdayLong, weekdayShort } from '../lib/date';
@@ -85,6 +85,7 @@ export function AssistantChat({
   messages,
   onMessages,
   onClose,
+  onHide,
   onAdded,
 }: {
   date: string;
@@ -92,6 +93,8 @@ export function AssistantChat({
   messages: ChatMessage[];
   onMessages: (update: (prev: ChatMessage[]) => ChatMessage[]) => void;
   onClose?: () => void;
+  /** Oculta el asistente (vuelve desde Ajustes). */
+  onHide: () => void;
   onAdded: (count: number) => void;
 }) {
   const [text, setText] = useState('');
@@ -221,11 +224,22 @@ export function AssistantChat({
           <h2>Contale tu día</h2>
           <p>Lo ordeno en actividades y vos revisás antes de guardar.</p>
         </div>
-        {onClose && (
-          <button type="button" className="circle-btn sm" onClick={onClose} aria-label="Cerrar chat">
-            <X />
+        <div className="assistant-head-actions">
+          <button
+            type="button"
+            className="circle-btn ghost sm"
+            onClick={onHide}
+            aria-label="Ocultar asistente"
+            title="Ocultar asistente"
+          >
+            <EyeOff />
           </button>
-        )}
+          {onClose && (
+            <button type="button" className="circle-btn sm" onClick={onClose} aria-label="Cerrar chat">
+              <X />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="messages" ref={listRef} aria-live="polite">

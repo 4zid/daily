@@ -692,7 +692,9 @@ svg {
   padding: var(--gap);
 }
 
-.app[data-view='informe'] {
+/* Sin la columna del chat (informe, o asistente oculto), la principal ocupa su lugar. */
+.app[data-view='informe'],
+.app:not(:has(> .assistant-col)) {
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
 }
 
@@ -1699,6 +1701,11 @@ svg {
   align-items: center;
   gap: 12px;
   padding: 22px 22px 16px;
+}
+
+.assistant-head-actions {
+  display: flex;
+  gap: 4px;
 }
 
 .assistant-icon {
@@ -4699,8 +4706,8 @@ dialog.modal::backdrop {
 }
 
 @media (min-width: 1321px) {
-  /* En el registro del paciente, a la derecha está la columna del chat. */
-  .demo-root:has(.app[data-view='registro']) .demo-dock-wrap {
+  /* En el registro del paciente, a la derecha está la columna del chat (si no está oculta). */
+  .demo-root:has(.assistant-col) .demo-dock-wrap {
     left: calc(50vw + (var(--sidebar-w) - var(--assistant-w)) / 2);
   }
 }

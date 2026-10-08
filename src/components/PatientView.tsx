@@ -30,6 +30,7 @@ export function PatientView({
   onRetry,
   onDeleted,
   banner,
+  assistant,
 }: {
   days: Record<string, DayLog>;
   status: 'loading' | 'ready' | 'error';
@@ -44,6 +45,8 @@ export function PatientView({
   onDeleted: (date: string, entry: Entry) => void;
   /** Aviso opcional debajo del encabezado. */
   banner?: ReactNode;
+  /** Si el asistente de IA está a la vista (si no, no se lo menciona). */
+  assistant: boolean;
 }) {
   const today = todayISO();
   const dates = weekDays(week);
@@ -117,7 +120,13 @@ export function PatientView({
         })}
       </nav>
 
-      <DayPanel key={selectedDate} date={selectedDate} day={days[selectedDate]} onDeleted={onDeleted} />
+      <DayPanel
+        key={selectedDate}
+        date={selectedDate}
+        day={days[selectedDate]}
+        assistant={assistant}
+        onDeleted={onDeleted}
+      />
     </div>
   );
 }
@@ -125,10 +134,12 @@ export function PatientView({
 function DayPanel({
   date,
   day,
+  assistant,
   onDeleted,
 }: {
   date: string;
   day: DayLog | undefined;
+  assistant: boolean;
   onDeleted: (date: string, entry: Entry) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -183,7 +194,11 @@ function DayPanel({
             <span className="empty-icon">
               <NotebookPen aria-hidden />
             </span>
-            <p>Cargá tu primera actividad arriba o contale a la IA cómo fue tu día.</p>
+            <p>
+              {assistant
+                ? 'Cargá tu primera actividad arriba o contale a la IA cómo fue tu día.'
+                : 'Cargá tu primera actividad arriba.'}
+            </p>
           </div>
         ) : (
           <ul className="items">

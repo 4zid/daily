@@ -44,6 +44,8 @@ export function PatientApp({
   const [week, setWeek] = useState(thisWeek);
   const [selectedDate, setSelectedDate] = useState(today);
   const [chats, setChats] = useState<Record<string, ChatMessage[]>>({});
+  // El asistente de IA es opcional: se oculta desde su panel o en Ajustes (queda guardado en este navegador).
+  const assistant = useLocal().assistant;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -189,6 +191,40 @@ export function PatientApp({
     [selectedDate],
   );
 
+  // Alguna propuesta de la IA sin guardar, o un pedido todavía en camino (el último mensaje es del paciente).
+  const pendingProposal = Object.values(chats).some(
+    (list) => list.some((m) => m.role === 'assistant' && m.status === 'pending') || list[list.length - 1]?.role === 'user',
+  );
+
+  /** Muestra u oculta el asistente. Si hay una propuesta sin guardar, pregunta antes de ocultarlo. */
+  function setAssistant(shown: boolean): boolean {
+    if (shown === assistant) return true;
+    if (
+      !shown &&
+      pendingProposal &&
+      !window.confirm('Tenés una propuesta de la IA sin guardar. Si ocultás el asistente, no se agrega a tu día. ¿Ocultarlo igual?')
+    ) {
+      return false;
+    }
+    setSheetOpen(false);
+    local.setAssistant(shown);
+    return true;
+  }
+
+  function hideAssistant() {
+    const wasOpen = sheetOpen;
+    if (!setAssistant(false)) return;
+    // El botón se va con el panel: el foco pasa al día elegido, en la columna principal.
+    document.querySelector<HTMLElement>('.day-tile[aria-pressed="true"]')?.focus({ preventScroll: true });
+    notify('Ocultaste el asistente.', {
+      label: 'Deshacer',
+      run: () => {
+        local.setAssistant(true);
+        setSheetOpen(wasOpen);
+      },
+    });
+  }
+
   const banner =
     localCount > 0 && !demo ? (
       <div className="notice">
@@ -313,6 +349,7 @@ export function PatientApp({
             onRetry={weekState.reload}
             onDeleted={onDeleted}
             banner={banner}
+            assistant={assistant}
           />
         ) : (
           <TherapistView
@@ -328,7 +365,7 @@ export function PatientApp({
         )}
       </main>
 
-      {view === 'registro' && (
+      {view === 'registro' && assistant && (
         <>
           <div className={`sheet-backdrop${sheetOpen ? ' open' : ''}`} onClick={() => setSheetOpen(false)} />
           <aside className={`assistant-col${sheetOpen ? ' open' : ''}`} aria-label="Asistente">
@@ -339,6 +376,7 @@ export function PatientApp({
               messages={chatMessages}
               onMessages={onMessages}
               onClose={sheetOpen ? () => setSheetOpen(false) : undefined}
+              onHide={hideAssistant}
               onAdded={(count) =>
                 notify(count ? `Agregaste ${count} actividad${count === 1 ? '' : 'es'} al día.` : 'Guardado en el día.')
               }
@@ -363,6 +401,7 @@ export function PatientApp({
           setTherapist(null);
           notify('Dejaste de compartir tu registro.');
         }}
+        onAssistant={setAssistant}
         onClose={() => setSettingsOpen(false)}
         onToast={notify}
       />
