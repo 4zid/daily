@@ -6,6 +6,7 @@ import {
   EyeOff,
   Link2,
   LockKeyhole,
+  Mail,
   MailCheck,
   NotebookPen,
   Sparkles,
@@ -19,11 +20,11 @@ import { EMAIL_SENDER, LEGAL_EMAIL, consentKinds, type ConsentKind } from '../li
 import { navigate } from '../lib/route';
 import { markOnboardingSeen } from '../lib/store';
 import { authErrorMessage } from '../lib/supabase';
-import { Brand, Initials } from './common';
+import { Brand, Initials, useCooldown } from './common';
 import { LegalLink, LegalOwner } from './Legal';
 
 type Mode = 'login' | 'signup' | 'forgot' | 'sent' | 'confirm';
-type Role = 'therapist' | 'patient';
+export type Role = 'therapist' | 'patient';
 
 interface InviteInfo {
   status: 'idle' | 'loading' | 'valid' | 'invalid' | 'error';
@@ -31,6 +32,8 @@ interface InviteInfo {
 }
 
 const MIN_PASSWORD = 8;
+// Supabase deja pasar un minuto entre un email y otro a la misma persona.
+export const RESEND_SECONDS = 60;
 
 const POINTS: Record<Role, [LucideIcon, string][]> = {
   patient: [
@@ -45,6 +48,19 @@ const POINTS: Record<Role, [LucideIcon, string][]> = {
   ],
 };
 
+const HEADINGS: Record<Role, ReactNode> = {
+  patient: (
+    <>
+      Tu día, ordenado. <b>Tu terapeuta, al tanto.</b>
+    </>
+  ),
+  therapist: (
+    <>
+      El registro de tus pacientes, <b>semana a semana.</b>
+    </>
+  ),
+};
+
 /** Acepta el código solo o el link entero pegado en el campo. */
 function cleanCode(value: string): string {
   const fromLink = /invitacion\/([A-Za-z0-9]+)/.exec(value)?.[1];
@@ -55,14 +71,19 @@ export function AuthScreen({
   inviteCode,
   recovery,
   initialMode = 'login',
+  fromConfirmLink = false,
 }: {
   inviteCode: string | null;
   recovery: boolean;
   /** Pantalla pedida por la ruta ("#/ingresar" o "#/crear-cuenta"); sin ruta, el ingreso. */
   initialMode?: 'login' | 'signup';
+  /** Llegó con un link de siempre de Supabase que no se pudo usar acá (por ejemplo, abierto en
+   *  otro navegador): si era el de confirmar el email, la cuenta ya quedó confirmada. */
+  fromConfirmLink?: boolean;
 }) {
   const auth = useAuth();
   const ids = useId();
+  const emailRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<Mode>(inviteCode ? 'signup' : (initialMode ?? 'login'));
   const [role, setRole] = useState<Role>(inviteCode ? 'patient' : 'therapist');
   const [code, setCode] = useState(inviteCode ?? '');
@@ -78,6 +99,9 @@ export function AuthScreen({
   const consentRefs = useRef<Partial<Record<ConsentKind, HTMLInputElement | null>>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // "Reenviar el email" en "Confirmá tu email": cuándo se puede y si ya salió.
+  const resendWait = useCooldown();
+  const [resent, setResent] = useState(false);
   const [invite, setInvite] = useState<InviteInfo>({ status: 'idle' });
   // Sube para volver a buscar la invitación si falló la conexión.
   const [lookupTry, setLookupTry] = useState(0);
@@ -133,6 +157,34 @@ export function AuthScreen({
     setError('');
     setConsentError(false);
     setShowPassword(false);
+    setResent(false);
+    // El email de confirmación acaba de salir: el próximo, en un minuto.
+    if (next === 'confirm') resendWait.start(RESEND_SECONDS);
+  }
+
+  function resendConfirmation() {
+    if (busy || resendWait.left > 0) return;
+    setResent(false);
+    void run(async () => {
+      try {
+        await auth.resendConfirmation(email);
+      } catch (e) {
+        if (/only request this after/i.test(e instanceof Error ? e.message : '')) resendWait.start(RESEND_SECONDS);
+        throw e;
+      }
+      resendWait.start(RESEND_SECONDS);
+      setResent(true);
+    });
+  }
+
+  /** "Usé otro email" (terapeutas): vuelve al alta con todo lo demás completo, para corregir el
+   *  email. Al paciente no se le ofrece: su invitación ya quedó usada con el email anterior. */
+  function editEmail() {
+    go('signup');
+    requestAnimationFrame(() => {
+      emailRef.current?.focus();
+      emailRef.current?.select();
+    });
   }
 
   async function run(task: () => Promise<void>) {
@@ -185,21 +237,16 @@ export function AuthScreen({
     }
   }
 
-  const accentRole: Role = mode === 'signup' ? role : 'patient';
+  // El alta y su "Confirmá tu email" siguen con el color del rol elegido.
+  const accentRole: Role = mode === 'signup' || mode === 'confirm' ? role : 'patient';
   const therapistName = invite.status === 'valid' ? invite.therapistName?.trim() : '';
   const heading =
     therapistName && mode === 'signup' ? (
       <>
         <b>{therapistName}</b> te invitó a llevar tu registro diario.
       </>
-    ) : accentRole === 'therapist' ? (
-      <>
-        El registro de tus pacientes, <b>semana a semana.</b>
-      </>
     ) : (
-      <>
-        Tu día, ordenado. <b>Tu terapeuta, al tanto.</b>
-      </>
+      HEADINGS[accentRole]
     );
 
   const passwordField = (label: string, autoComplete: string, hint?: string) => (
@@ -239,6 +286,7 @@ export function AuthScreen({
     <div className="field">
       <label htmlFor={`${ids}-email`}>Email</label>
       <input
+        ref={emailRef}
         id={`${ids}-email`}
         className="input"
         type="email"
@@ -251,7 +299,8 @@ export function AuthScreen({
     </div>
   );
 
-  let title: string;
+  // Sin título: la pantalla es un resultado (AuthResult), con su propio título.
+  let title: string | null;
   let sub: ReactNode;
   let body: ReactNode;
   let foot: ReactNode;
@@ -270,32 +319,71 @@ export function AuthScreen({
         Cancelar
       </button>
     );
-  } else if (mode === 'sent' || mode === 'confirm') {
-    title = mode === 'sent' ? 'Revisá tu email' : 'Confirmá tu email';
+  } else if (mode === 'sent') {
+    title = null;
     sub = null;
     body = (
-      <div className="auth-message">
-        <span className="empty-icon">
-          <MailCheck aria-hidden />
-        </span>
+      <AuthResult icon={MailCheck} title="Revisá tu email">
         <p>
-          {mode === 'sent' ? (
-            <>
-              Si hay una cuenta con <b>{email}</b>, te llega un link para elegir una contraseña nueva.
-            </>
-          ) : (
-            <>
-              Te mandamos un link a <b>{email}</b>. Abrilo para activar tu cuenta.
-            </>
-          )}{' '}
-          Si no aparece en unos minutos, revisá el correo no deseado.
+          Si hay una cuenta con <b className="auth-result-email">{email}</b>{' '}
+          te llega un link para elegir una contraseña nueva.
         </p>
-        <button type="button" className="btn btn-primary" onClick={() => go('login')}>
-          Ir a ingresar
-        </button>
-      </div>
+        <p className="auth-result-hint">Si no lo ves en unos minutos, revisá Spam o Promociones.</p>
+        <div className="auth-result-actions">
+          <button type="button" className="btn btn-primary btn-block" onClick={() => go('login')}>
+            Ir a ingresar
+          </button>
+        </div>
+      </AuthResult>
     );
     foot = null;
+  } else if (mode === 'confirm') {
+    title = null;
+    sub = null;
+    body = (
+      <AuthResult icon={Mail} title="Confirmá tu email">
+        <p>
+          Te mandamos un email a <b className="auth-result-email">{email}</b>{' '}
+          Abrilo y tocá <b>«Confirmar mi email»</b>.
+        </p>
+        <p className="auth-result-hint">
+          Podés abrirlo en el celular. Si no lo ves en unos minutos, revisá Spam o Promociones.
+        </p>
+        <div className="auth-result-actions">
+          <button type="button" className="btn btn-primary btn-block" onClick={() => go('login')}>
+            Ya lo confirmé · Ingresar
+            <ArrowRight aria-hidden />
+          </button>
+          {/* aria-disabled y no disabled: así el botón no pierde el foco durante la espera. */}
+          <button
+            type="button"
+            className={`btn btn-block${resendWait.left > 0 ? ' is-waiting' : ''}`}
+            aria-disabled={busy || resendWait.left > 0}
+            aria-busy={busy}
+            onClick={resendConfirmation}
+          >
+            {busy ? 'Un momento…' : resendWait.left > 0 ? `Reenviar el email en ${resendWait.left} s` : 'Reenviar el email'}
+          </button>
+        </div>
+        {resent && (
+          <p className="form-note" role="status">
+            Listo, te lo mandamos de nuevo. Puede tardar unos minutos.
+          </p>
+        )}
+      </AuthResult>
+    );
+    // La invitación del paciente ya quedó usada con este email: para corregirlo hace falta otra.
+    foot =
+      role === 'patient' ? (
+        <p className="auth-foot-note">
+          ¿Escribiste mal tu email? Pedile a tu terapeuta un link de invitación nuevo y creá la cuenta otra vez con
+          el email correcto.
+        </p>
+      ) : (
+        <button type="button" className="link-btn" onClick={editEmail}>
+          Usé otro email
+        </button>
+      );
   } else if (mode === 'forgot') {
     title = 'Recuperá tu contraseña';
     sub = 'Te mandamos un link para elegir una nueva.';
@@ -320,6 +408,11 @@ export function AuthScreen({
       : 'Con el email y la contraseña de tu cuenta.';
     body = (
       <>
+        {fromConfirmLink && (
+          <p className="form-note">
+            Si venías de confirmar tu email, ya quedó confirmado: ingresá con tu email y contraseña.
+          </p>
+        )}
         {emailField}
         {passwordField('Contraseña', 'current-password')}
         <button type="button" className="link-btn forgot" onClick={() => go('forgot')}>
@@ -490,7 +583,50 @@ export function AuthScreen({
   }
 
   return (
-    <div className="auth" data-role={accentRole === 'therapist' ? 'therapist' : 'patient'}>
+    <AuthLayout role={accentRole} heading={heading}>
+      <div className="tray auth-tray">
+        <form className="tray-card auth-form" onSubmit={submit} noValidate={false}>
+          {title && (
+            <header className="auth-head">
+              <h1>{title}</h1>
+              {sub && <p className="sub">{sub}</p>}
+            </header>
+          )}
+          {body}
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+        </form>
+        {foot && <div className="tray-foot auth-foot">{foot}</div>}
+      </div>
+      {/* Mientras espera el email, la pantalla queda solo con lo que hay que hacer. */}
+      {!inviteCode && !recovery && mode !== 'confirm' && mode !== 'sent' && (
+        <div className="auth-demo">
+          <span className="auth-demo-text">
+            <b>¿Querés ver cómo funciona?</b> Probala con datos de ejemplo, sin cuenta.
+          </span>
+          <span className="auth-demo-actions">
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => navigate('demo/paciente')}>
+              Probar la demo
+              <ArrowRight aria-hidden />
+            </button>
+            <button type="button" className="link-btn" onClick={() => navigate('bienvenida')}>
+              Ver la presentación
+            </button>
+          </span>
+        </div>
+      )}
+    </AuthLayout>
+  );
+}
+
+/** El marco de las pantallas de cuenta: el panel con la marca y lo que ofrece daily para cada
+ *  rol (en el celular no está) y la columna con la pantalla y los links legales. */
+export function AuthLayout({ role, heading, children }: { role: Role; heading?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="auth" data-role={role}>
       <aside className="auth-aside">
         <svg className="auth-art" viewBox="0 0 400 600" aria-hidden preserveAspectRatio="xMidYMax slice">
           <circle cx="360" cy="560" r="240" />
@@ -501,9 +637,9 @@ export function AuthScreen({
         </svg>
         <Brand />
         <div className="auth-pitch">
-          <p className="auth-title">{heading}</p>
+          <p className="auth-title">{heading ?? HEADINGS[role]}</p>
           <ul className="auth-points">
-            {POINTS[accentRole].map(([Icon, text]) => (
+            {POINTS[role].map(([Icon, text]) => (
               <li key={text}>
                 <span className="auth-point-icon">
                   <Icon aria-hidden />
@@ -520,37 +656,7 @@ export function AuthScreen({
         <div className="auth-mobile-brand">
           <Brand />
         </div>
-        <div className="tray auth-tray">
-          <form className="tray-card auth-form" onSubmit={submit} noValidate={false}>
-            <header className="auth-head">
-              <h1>{title}</h1>
-              {sub && <p className="sub">{sub}</p>}
-            </header>
-            {body}
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
-          </form>
-          {foot && <div className="tray-foot auth-foot">{foot}</div>}
-        </div>
-        {!inviteCode && !recovery && (
-          <div className="auth-demo">
-            <span className="auth-demo-text">
-              <b>¿Querés ver cómo funciona?</b> Probala con datos de ejemplo, sin cuenta.
-            </span>
-            <span className="auth-demo-actions">
-              <button type="button" className="btn btn-sm btn-primary" onClick={() => navigate('demo/paciente')}>
-                Probar la demo
-                <ArrowRight aria-hidden />
-              </button>
-              <button type="button" className="link-btn" onClick={() => navigate('bienvenida')}>
-                Ver la presentación
-              </button>
-            </span>
-          </div>
-        )}
+        {children}
         <nav className="auth-legal" aria-label="Legal">
           <LegalLink page="privacidad" newTab>
             Privacidad
@@ -561,6 +667,42 @@ export function AuthScreen({
           <a href={`mailto:${LEGAL_EMAIL}`}>Contacto</a>
         </nav>
       </main>
+    </div>
+  );
+}
+
+/** Una pantalla de resultado (email enviado, link confirmado o vencido): ícono, título, texto
+ *  y acciones, centrados. `tone` pinta el ícono: con el acento del rol o neutro. */
+export function AuthResult({
+  icon: Icon,
+  tone = 'accent',
+  title,
+  children,
+}: {
+  icon: LucideIcon;
+  tone?: 'accent' | 'neutral';
+  title: string;
+  children: ReactNode;
+}) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+
+  // Si el botón que tenía el foco desapareció (por ejemplo, "Crear cuenta" al pasar a
+  // "Confirmá tu email"), el foco pasa al título: así el teclado y el lector de pantalla
+  // siguen desde acá y no desde el principio de la página.
+  useEffect(() => {
+    const active = document.activeElement;
+    if (!active || active === document.body || !active.isConnected) titleRef.current?.focus();
+  }, [title]);
+
+  return (
+    <div className="auth-result" data-tone={tone}>
+      <span className="auth-result-icon">
+        <Icon aria-hidden />
+      </span>
+      <h1 ref={titleRef} tabIndex={-1}>
+        {title}
+      </h1>
+      {children}
     </div>
   );
 }

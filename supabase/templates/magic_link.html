@@ -1,0 +1,64 @@
+<!--
+  daily · Tu link para ingresar
+  Dónde va: Supabase → Authentication → Emails → Templates → Magic link → pestaña "Source" (se pega todo este archivo).
+  Asunto: Tu link para ingresar a daily
+  Instrucciones completas: supabase/templates/README.md
+-->
+<!DOCTYPE html>
+<html lang="es" xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no">
+    <meta name="color-scheme" content="light only">
+    <meta name="supported-color-schemes" content="light only">
+    <title>Tu link para ingresar</title>
+  </head>
+  <body style="margin:0;padding:0;width:100%;background-color:#eeeef2;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+    <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;color:#eeeef2;">Tocá el botón para ingresar a daily, sin contraseña.&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eeeef2" style="width:100%;background-color:#eeeef2;">
+      <tr>
+        <td align="center" style="padding:32px 12px 40px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;">
+            <tr>
+              <td style="padding:0 8px 20px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td style="vertical-align:middle;">
+                      <img src="https://daily-nine-ruddy.vercel.app/email/daily-mark.png" width="40" height="40" alt="daily" style="display:block;width:40px;height:40px;border:0;outline:none;text-decoration:none;">
+                    </td>
+                    <td aria-hidden="true" style="vertical-align:middle;padding-left:12px;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:22px;line-height:1;font-weight:500;letter-spacing:-0.03em;color:#141418;">daily</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td bgcolor="#ffffff" style="padding:36px 28px 30px;border-radius:22px;background-color:#ffffff;">
+                <h1 style="margin:0 0 18px;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:26px;line-height:1.2;font-weight:600;letter-spacing:-0.02em;color:#141418;">Tu link para ingresar</h1>
+                <p style="margin:0 0 10px;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.55;color:#141418;overflow-wrap:anywhere;word-break:break-word;">{{ if .Data.full_name }}¡Hola, {{ printf "%.48v" .Data.full_name }}!{{ else }}¡Hola!{{ end }}</p>
+                <p style="margin:0 0 28px;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:1.55;color:#55555f;overflow-wrap:anywhere;word-break:break-word;">Tocá el botón para ingresar a tu cuenta de daily. No hace falta contraseña.</p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td align="center" bgcolor="#141418" style="border-radius:999px;background-color:#141418;mso-padding-alt:15px 28px;">
+                      <a href="{{ .SiteURL }}/?token_hash={{ .TokenHash }}&amp;type=email" target="_blank" rel="noopener" style="display:inline-block;padding:15px 28px;border:1px solid #141418;border-radius:999px;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px;line-height:20px;font-weight:600;color:#ffffff;text-decoration:none;"><font color="#ffffff">Ingresar a daily</font></a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:24px 0 0;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#696974;">El link sirve una sola vez y vence en poco tiempo.</p>
+                <p style="margin:24px 0 6px;padding-top:20px;border-top:1px solid #ececf1;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;color:#696974;">¿El botón no funciona? Copiá este link y pegalo en tu navegador:</p>
+                <p style="margin:0;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.5;word-break:break-all;"><a href="{{ .SiteURL }}/?token_hash={{ .TokenHash }}&amp;type=email" target="_blank" rel="noopener" style="color:#1f6b4a;text-decoration:underline;">{{ .SiteURL }}/?token_hash={{ .TokenHash }}&amp;type=email</a></p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 16px 0;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#696974;overflow-wrap:anywhere;word-break:break-word;">
+                <p style="margin:0 0 8px;">Te llegó este email porque se pidió un link para ingresar a daily con {{ .Email }}. Si no fuiste vos, ignorá este email.</p>
+                <p style="margin:0;">¿Dudas? Escribinos a <a href="mailto:hola@pantufla.design" style="color:#55555f;text-decoration:underline;">hola@pantufla.design</a> · <a href="https://daily-nine-ruddy.vercel.app/#/privacidad" target="_blank" rel="noopener" style="color:#55555f;text-decoration:underline;">Privacidad</a></p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

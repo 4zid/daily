@@ -11,10 +11,10 @@ export const LEGAL_COUNTRY = 'Argentina';
 // La Ley 25.326 (art. 6, inc. b) pide informar también un domicilio. Cuando haya uno para
 // publicar (puede ser un domicilio constituido), va acá y aparece solo en las dos páginas y
 // en el aviso del alta.
-export const LEGAL_ADDRESS: string | null = null;
+export const LEGAL_ADDRESS: string | null = 'Taparello 448, Río Grande, Tierra del Fuego';
 // CUIT del responsable (lo piden las normas de comercio electrónico junto al domicilio).
 // Cuando esté, aparece solo junto al nombre del responsable.
-export const LEGAL_CUIT: string | null = null;
+export const LEGAL_CUIT: string | null = '20-41903976-5';
 // Número de inscripción de la base de datos en el Registro Nacional de Bases de Datos de la
 // AAIP (arts. 21 y 24 de la Ley 25.326). Cuando esté, aparece en la sección 1 de la política.
 export const LEGAL_RNBD: string | null = null;

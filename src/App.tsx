@@ -1,10 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuth } from './lib/auth';
 import { resetCloudCache } from './lib/cloud';
+import { hasAuthCode, startupLink } from './lib/emailLink';
 import { inviteCodeFrom, navigate, useHashPath } from './lib/route';
 import { hadSessionHere, hasSeenOnboarding, markHadSession, markOnboardingSeen, useLocal } from './lib/store';
 import { AuthScreen } from './components/AuthScreen';
 import { DemoApp } from './components/DemoApp';
+import { EmailLinkScreen } from './components/EmailLinkScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Landing } from './components/Landing';
 import { LegalPage } from './components/Legal';
@@ -15,7 +17,8 @@ import { Brand } from './components/common';
 
 // Rutas: "/" sin sesión es la landing; "#/bienvenida" (presentación), "#/demo/…" (demo como
 // invitado), "#/ingresar", "#/crear-cuenta", "#/invitacion/CÓDIGO", "#/privacidad" y
-// "#/terminos" (páginas legales, para todos), y las de la app.
+// "#/terminos" (páginas legales, para todos), y las de la app. Los links de los emails de la
+// cuenta llegan a "/?token_hash=…" (ver lib/emailLink.ts).
 
 export default function App() {
   const path = useHashPath();
@@ -53,9 +56,34 @@ function Screens({ path }: { path: string }) {
     if (path === 'ingresar' || path === 'crear-cuenta') navigate('', true);
   }, [signedIn, path]);
 
+  // La pantalla del link de un email se cierra si la persona se va a otra ruta (por ejemplo,
+  // escribe otra dirección): no queda trabada ahí.
+  const lastPath = useRef(path);
+  const { emailLink, dismissEmailLink } = auth;
+  useEffect(() => {
+    if (path === lastPath.current) return;
+    lastPath.current = path;
+    if (emailLink && emailLink.step !== 'checking') dismissEmailLink();
+  }, [path, emailLink, dismissEmailLink]);
+
   // Las páginas legales son públicas: se ven con o sin sesión, mientras carga la cuenta, en la
   // recuperación de contraseña y sin perfil. Van antes que cualquier redirección.
   if (path === 'privacidad' || path === 'terminos') return <LegalPage key={path} page={path} />;
+
+  // Llegó con el link de un email (confirmar la cuenta o el cambio de email, o uno que ya no
+  // sirve): esa pantalla va antes que la app hasta que la persona sigue. El de recuperar la
+  // contraseña pasa directo a elegir una nueva.
+  const link = auth.emailLink;
+  if (link && auth.status !== 'recovery') {
+    if (link.step === 'checking' || auth.status === 'loading') {
+      return (
+        <div className="splash" role="status" aria-label="Abriendo el link">
+          <Brand />
+        </div>
+      );
+    }
+    return <EmailLinkScreen state={link} />;
+  }
 
   if (auth.status === 'loading') {
     return (
@@ -83,6 +111,7 @@ function Screens({ path }: { path: string }) {
         inviteCode={inviteCode}
         recovery={auth.status === 'recovery'}
         initialMode={path === 'crear-cuenta' ? 'signup' : path === 'ingresar' ? 'login' : undefined}
+        fromConfirmLink={startupLink?.kind === 'code' && hasAuthCode()}
       />
     );
   }

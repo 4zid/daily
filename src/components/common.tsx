@@ -398,6 +398,30 @@ export function Toast({ toast, onDone }: { toast: ToastState | null; onDone: () 
   );
 }
 
+/** Cuenta regresiva en segundos (por ejemplo, para no pedir otro email antes de tiempo).
+ *  `start(s)` la arranca; `left` es lo que falta, 0 cuando ya se puede. */
+export function useCooldown() {
+  const [until, setUntil] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (until <= Date.now()) return;
+    const t = window.setInterval(() => {
+      const n = Date.now();
+      setNow(n);
+      if (n >= until) window.clearInterval(t);
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [until]);
+  return {
+    left: Math.max(0, Math.ceil((until - now) / 1000)),
+    start(seconds: number) {
+      const n = Date.now();
+      setNow(n);
+      setUntil(n + seconds * 1000);
+    },
+  };
+}
+
 export function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

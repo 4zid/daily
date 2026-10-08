@@ -14,6 +14,12 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   },
 });
 
+/** A dónde vuelven los links de los emails de Supabase. Con la barra final, para que coincida
+ *  con las Redirect URLs del proyecto ("…/**"), que la piden después del dominio. */
+export function authRedirectUrl(): string {
+  return `${window.location.origin}/`;
+}
+
 export type UserRole = 'patient' | 'therapist';
 
 export interface Profile {
@@ -36,6 +42,10 @@ export function authErrorMessage(error: unknown): string {
     return 'No pudimos enviar el email. Avisale a quien administra la app que configure el envío de mails.';
   }
   if (m.includes('email address') && m.includes('invalid')) return 'Revisá el email: no parece válido.';
+  // Supabase deja pasar un minuto entre un email y otro a la misma persona.
+  if (m.includes('only request this after')) return 'Ya te mandamos un email hace muy poco. Esperá un minuto y probá de nuevo.';
+  // El tope de emails por hora del proyecto (Authentication → Rate Limits).
+  if (m.includes('email rate limit')) return 'Se mandaron muchos emails en poco tiempo. Probá de nuevo en un rato.';
   if (m.includes('rate limit') || m.includes('too many')) return 'Hubo demasiados intentos. Esperá un minuto y probá de nuevo.';
   if (m.includes('failed to fetch') || m.includes('network')) return 'No hay conexión. Revisá internet y probá de nuevo.';
   return 'Algo salió mal. Probá de nuevo en un momento.';

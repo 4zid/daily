@@ -379,7 +379,9 @@ svg {
   transform: scale(0.98);
 }
 
-.btn:disabled {
+/* aria-disabled: deshabilitado sin perder el foco (por ejemplo, durante una cuenta regresiva). */
+.btn:disabled,
+.btn[aria-disabled='true'] {
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
@@ -3076,19 +3078,131 @@ dialog.modal::backdrop {
   color: var(--text-2);
 }
 
-.auth-message {
+/* Un aviso en lugar de un link al pie (por ejemplo, el paciente que escribió mal su email). */
+.auth-foot-note {
+  max-width: 40ch;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+/* Pantallas de resultado ("Confirmá tu email", link confirmado o vencido): ícono, título,
+   texto y acciones, centrados. */
+.auth-result {
   display: grid;
   justify-items: center;
-  gap: 14px;
-  padding: 4px 0;
-  font-size: 14px;
+  gap: 10px;
+  padding: 6px 0 2px;
   text-align: center;
+}
+
+.auth-result h1 {
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+/* El título recibe el foco cuando la pantalla cambia (para el teclado y los lectores de
+   pantalla), sin anillo. */
+.auth-result h1[tabindex='-1']:focus {
+  outline: none;
+}
+
+.auth-result > p {
+  max-width: 36ch;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.auth-result b {
+  font-weight: 500;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* El email al que se mandó, en su propia línea: se lee entero para ver si está bien escrito. */
+.auth-result-email {
+  display: block;
+  margin: 2px 0;
+}
+
+.auth-result > .auth-result-hint {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.auth-result-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.auth-result-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.auth-result[data-tone='neutral'] .auth-result-icon {
+  background: var(--surface-2);
   color: var(--text-2);
 }
 
-.auth-message b {
-  font-weight: 500;
+.auth-result-actions {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* Reenviar con la cuenta regresiva: deshabilitado, pero la espera se tiene que poder leer. */
+.btn.is-waiting:is(:disabled, [aria-disabled='true']) {
+  opacity: 1;
+  color: var(--text-3);
+  box-shadow: none;
+}
+
+/* Pedir otro email desde un link vencido: el formulario queda debajo de las acciones. */
+.auth-resend {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  margin-top: 8px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+
+/* Aviso o confirmación en una pantalla de cuenta (lo que no es un error). */
+.form-note {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--accent-soft);
   color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.auth-result > .form-note {
+  width: 100%;
+  max-width: none;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.form-note b {
+  font-weight: 500;
 }
 
 .field > label {
@@ -3544,7 +3658,8 @@ dialog.modal::backdrop {
     padding: 22px 18px 18px;
   }
 
-  .auth-head h1 {
+  .auth-head h1,
+  .auth-result h1 {
     font-size: 24px;
   }
 

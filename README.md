@@ -41,12 +41,11 @@ La seguridad está en la base, con **reglas de acceso por fila (RLS)**: el pacie
 
 ### Configuración de Supabase (una vez)
 
-En el panel del proyecto:
+Los emails de la cuenta (confirmar el email, elegir una contraseña nueva, cambiar el email) necesitan cuatro cosas en el panel del proyecto: **Site URL** y **Redirect URLs** apuntando a producción, un SMTP propio (Resend), el tope de emails por hora y los templates de `supabase/templates/`. El paso a paso, sin código, está en **[supabase/templates/README.md](supabase/templates/README.md)**.
 
-1. **Authentication → Sign In / Providers → Email**: desactivá **Confirm email**. El envío de mails que trae Supabase solo llega a los miembros del equipo, así que con la confirmación activada las cuentas nuevas no se pueden crear. Si preferís confirmar emails, configurá un SMTP propio (por ejemplo Resend) en **Authentication → Emails → SMTP Settings** y volvé a activarla.
-2. **Authentication → URL Configuration**: en **Site URL** poné el dominio de producción (`https://daily-nine-ruddy.vercel.app`) y agregalo también en **Redirect URLs**. Lo usan los links de "Olvidé mi contraseña".
-3. Recuperar la contraseña por mail necesita el SMTP propio del punto 1. Sin eso, la persona puede cambiar su contraseña desde **Ajustes** con la sesión iniciada.
-4. Opcional: **Authentication → Attack Protection → Leaked password protection** (si tu plan la tiene).
+- **Authentication → Sign In / Providers → Email**: **Confirm email** prendido (con el SMTP propio los emails le llegan a cualquiera).
+- Los templates llevan a la raíz de la app con `?token_hash=…&type=…`; la app lo verifica al abrir (`src/lib/emailLink.ts` y `src/lib/auth.tsx`), así el link sirve en cualquier dispositivo. Los links de siempre de Supabase (`?code=…`) siguen funcionando en el mismo navegador.
+- Opcional: **Authentication → Attack Protection → Leaked password protection** (si tu plan la tiene).
 
 Para usar otro proyecto de Supabase, aplicá las migraciones de `supabase/migrations/` y definí `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` (y `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY` para la función de la IA).
 
@@ -119,12 +118,15 @@ Si una actividad tiene hora de fin, se usa esa. Si solo tiene hora de inicio, cu
 ```
 api/organize.ts            Función serverless: verifica la sesión y ordena el relato con la IA (Groq)
 supabase/migrations/       Esquema, reglas de acceso y funciones de la base
+supabase/templates/        Emails de la cuenta para pegar en Supabase (con su README)
+public/email/              Logo de los emails (daily-mark.png)
 vite.config.ts             Sirve /api/organize en desarrollo con el mismo handler
 src/App.tsx                Rutas y sesión: presentación, demo, ingreso, app de paciente o de terapeuta
 src/components/
   Onboarding.tsx           Presentación en pasos con ilustraciones animadas
   DemoApp.tsx              Demo como invitado: barra para cambiar de rol, reiniciar y salir
   AuthScreen.tsx           Ingreso, alta (terapeuta / paciente con invitación), recuperar contraseña
+  EmailLinkScreen.tsx      Al abrir el link de un email: email confirmado, link vencido, sin conexión
   PatientApp.tsx           Layout del paciente: semanas, registro, informe, chat, invitaciones
   TherapistApp.tsx         Layout del terapeuta: pacientes, semanas, informe, invitar
   PatientView.tsx          Semana, tira de días, actividades y reflexión
@@ -137,6 +139,7 @@ src/components/
 src/lib/
   supabase.ts              Cliente de Supabase y mensajes de error
   auth.tsx                 Sesión, perfil y acciones de cuenta
+  emailLink.ts             Lee el link de un email de la cuenta al abrir la app
   backend.ts               Acceso a Supabase (lecturas y escrituras), con la misma forma que la demo
   cloud.ts                 Caché de semanas, guardado optimista, notas, vínculos e invitaciones
   demo.ts                  Datos de ejemplo y base en memoria de la demo
