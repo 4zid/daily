@@ -2053,8 +2053,53 @@ svg {
 }
 
 /* Con un desplegable abierto, el botón flotante no tapa nada. */
-.app:has(.time-pop, .menu) .fab {
+.app:has(.time-pop, .menu) .fab,
+.app:has(.time-pop, .menu) .assistant-reshow {
   visibility: hidden;
+}
+
+/* Asistente oculto: un botón chico abajo a la derecha, donde estaba, para volver a mostrarlo.
+   Secundario a propósito (no el negro del botón flotante): está a mano sin pedir atención. */
+.assistant-reshow {
+  position: fixed;
+  right: calc(var(--gap) + env(safe-area-inset-right, 0px));
+  bottom: calc(var(--gap) + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px 0 13px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: var(--shadow-2);
+  transition: border-color 0.15s, transform 0.15s;
+  animation: reshow-in 0.3s var(--ease-out) 0.1s backwards;
+}
+
+.assistant-reshow:hover {
+  border-color: var(--border-strong);
+}
+
+.assistant-reshow:active {
+  transform: scale(0.97);
+}
+
+.assistant-reshow svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+@keyframes reshow-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
 }
 
 /* ═════════════════════════ Informe del terapeuta ═════════════════════════ */
@@ -2888,12 +2933,16 @@ dialog.modal::backdrop {
   display: flex;
   align-items: center;
   gap: 14px;
+  /* Con left: 50% el ancho se achicaría a medio viewport: un aviso largo usa todo el ancho
+     disponible, y si ocupa dos líneas sigue redondeado (en una línea es una píldora igual). */
+  width: max-content;
   max-width: calc(100vw - 32px);
   padding: 12px 12px 12px 20px;
-  border-radius: 999px;
+  border-radius: 28px;
   background: var(--ink);
   color: var(--ink-text);
   font-size: 14px;
+  text-wrap: pretty;
   box-shadow: var(--shadow-3);
   transform: translateX(-50%);
   animation: rise 0.2s ease-out;
@@ -5309,6 +5358,18 @@ dialog.modal::backdrop {
     transition: transform 0.28s ease;
   }
 
+  /* Si el panel vuelve abierto (al mostrar el asistente otra vez), entra deslizándose. */
+  @starting-style {
+    .assistant-col.open {
+      transform: translateX(calc(100% + 32px));
+    }
+  }
+
+  /* El aviso queda arriba del botón para volver a mostrar el asistente: no se tapan. */
+  .app:has(> .assistant-reshow) .toast {
+    bottom: calc(var(--gap) + 52px + env(safe-area-inset-bottom, 0px));
+  }
+
   .sheet-backdrop.open {
     display: block;
     position: fixed;
@@ -5432,9 +5493,38 @@ dialog.modal::backdrop {
     transform: translateY(105%);
   }
 
+  @starting-style {
+    .assistant-col.open {
+      transform: translateY(105%);
+    }
+  }
+
   .fab {
     right: 16px;
     bottom: 16px;
+  }
+
+  /* En el celular, un botón redondo chico en el lugar del botón flotante. */
+  .assistant-reshow {
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+  }
+
+  .assistant-reshow svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .assistant-reshow-text {
+    display: none;
+  }
+
+  .app:has(> .assistant-reshow) .toast {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
 
   .hero-card {
@@ -5762,6 +5852,7 @@ dialog.modal::backdrop {
   .mobile-bar,
   .assistant-col,
   .fab,
+  .assistant-reshow,
   .no-print,
   .notice,
   .demo-dock-wrap {
