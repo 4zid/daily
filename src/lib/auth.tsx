@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
+import { consentMetadata } from './legal';
 import { supabase, type Profile } from './supabase';
 
 type Status = 'loading' | 'signed-out' | 'signed-in' | 'no-profile' | 'recovery';
@@ -9,8 +10,17 @@ interface AuthValue {
   session: Session | null;
   profile: Profile | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUpTherapist: (input: { name: string; email: string; password: string }) => Promise<{ needsConfirmation: boolean }>;
-  signUpPatient: (input: { name: string; email: string; password: string; code: string }) => Promise<{ needsConfirmation: boolean }>;
+  // `consent: true` obliga a quien crea la cuenta a haber aceptado los Términos y la Política
+  // de privacidad (y, el paciente, el uso de sus datos de salud): cualquier alta nueva, por
+  // ejemplo con otro proveedor de ingreso, tiene que pedirlo antes de empezar.
+  signUpTherapist: (input: { name: string; email: string; password: string; consent: true }) => Promise<{ needsConfirmation: boolean }>;
+  signUpPatient: (input: {
+    name: string;
+    email: string;
+    password: string;
+    code: string;
+    consent: true;
+  }) => Promise<{ needsConfirmation: boolean }>;
   signOut: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -94,7 +104,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { data: { role: 'therapist', full_name: name.trim() }, emailRedirectTo: window.location.origin },
+          // El consentimiento queda en los datos de la cuenta (ver consentMetadata en lib/legal.ts).
+          options: {
+            data: { role: 'therapist', full_name: name.trim(), ...consentMetadata('therapist') },
+            emailRedirectTo: window.location.origin,
+          },
         });
         if (error) throw error;
         return { needsConfirmation: !data.session };
@@ -104,7 +118,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: email.trim(),
           password,
           options: {
-            data: { role: 'patient', full_name: name.trim(), invite_code: code.trim().toUpperCase() },
+            data: {
+              role: 'patient',
+              full_name: name.trim(),
+              invite_code: code.trim().toUpperCase(),
+              ...consentMetadata('patient'),
+            },
             emailRedirectTo: window.location.origin,
           },
         });

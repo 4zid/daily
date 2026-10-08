@@ -1,0 +1,612 @@
+/* ═════════════════════════ Páginas legales ═════════════════════════
+   Política de privacidad y Términos y condiciones (src/components/Legal.tsx). Usa solo
+   los tokens de la app, así hereda el modo oscuro. En el celular es una columna; en
+   pantallas anchas el índice queda fijo a la izquierda. Al imprimir queda solo el texto. */
+
+/* Los saltos a una sección no quedan debajo de la barra fija. */
+html:has(.legal) {
+  scroll-padding-top: 88px;
+}
+
+.legal {
+  --legal-gutter: clamp(16px, 4vw, 40px);
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Los títulos reciben el foco al llegar o al saltar a una sección, sin anillo. */
+.legal :is(h1, h2)[tabindex='-1']:focus {
+  outline: none;
+}
+
+/* ── barra ── */
+.legal-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(1.6) blur(16px);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.legal-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: calc(1058px + 2 * var(--legal-gutter));
+  margin: 0 auto;
+  padding: 10px var(--legal-gutter);
+}
+
+.legal-bar .brand {
+  padding: 0;
+  font-size: 20px;
+}
+
+.legal-bar .brand-mark {
+  width: 34px;
+  height: 34px;
+}
+
+/* ── estructura ── */
+.legal-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'head' 'toc' 'doc' 'foot';
+  gap: 20px;
+  max-width: calc(760px + 2 * var(--legal-gutter));
+  margin: 0 auto;
+  padding: 28px var(--legal-gutter) 56px;
+}
+
+.legal-head {
+  grid-area: head;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* ── pestañas entre los dos documentos ── */
+.legal-switch {
+  display: inline-flex;
+  justify-self: start;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--tray);
+  box-shadow: var(--tray-edge);
+}
+
+.legal-switch a {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+}
+
+.legal-switch a:hover {
+  color: var(--text);
+}
+
+.legal-switch a[aria-current='page'] {
+  background: var(--raised);
+  color: var(--text);
+  box-shadow: var(--shadow-2);
+}
+
+/* ── título, resumen ── */
+.legal-title {
+  margin-top: 14px;
+  font-size: clamp(32px, 3vw + 20px, 46px);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.legal-meta {
+  font-size: 14px;
+  color: var(--text-3);
+}
+
+.legal-intro p {
+  max-width: 62ch;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.legal-summary {
+  margin-top: 8px;
+}
+
+.legal-summary .tray-card {
+  padding: 22px 24px;
+}
+
+.legal-summary h2 {
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.legal-summary ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legal-summary li {
+  position: relative;
+  padding-left: 22px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.legal-summary li::before {
+  content: '';
+  position: absolute;
+  top: 0.62em;
+  left: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.legal-summary b {
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* ── índice ── */
+.legal-toc {
+  grid-area: toc;
+  min-width: 0;
+  padding: 18px 20px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.legal-toc h2 {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.legal-toc ol {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0 0 0 1.7em;
+  font-size: 14px;
+  color: var(--text-3);
+}
+
+.legal-toc li::marker {
+  font-variant-numeric: tabular-nums;
+}
+
+.legal-toc a {
+  display: block;
+  padding: 5px 0;
+  color: var(--text-2);
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.legal-toc a:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+
+/* ── texto ── */
+.legal-doc {
+  grid-area: doc;
+  min-width: 0;
+  padding: clamp(20px, 5vw, 52px);
+  overflow-wrap: break-word;
+}
+
+.legal-section + .legal-section {
+  margin-top: 36px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+
+.legal-section h2 {
+  margin-bottom: 14px;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.legal-num {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.legal-section h3 {
+  margin: 24px 0 8px;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.legal-section h2 + h3 {
+  margin-top: 0;
+}
+
+.legal-doc :is(p, li) {
+  max-width: 68ch;
+  font-size: 16px;
+  line-height: 1.65;
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.legal-doc :is(p, ul, blockquote, table, .legal-emergency) + :is(p, ul, blockquote, table, .legal-emergency) {
+  margin-top: 12px;
+}
+
+.legal-doc ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.25em;
+}
+
+.legal-doc li::marker {
+  color: var(--text-3);
+}
+
+.legal-doc :is(b, strong) {
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* Links del texto: subrayado suave, como .link-btn. */
+.legal-doc a,
+.legal-intro a,
+.legal-summary a,
+.legal-foot a {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.legal-doc a:hover,
+.legal-intro a:hover,
+.legal-summary a:hover,
+.legal-foot a:hover {
+  text-decoration-color: currentColor;
+}
+
+.legal-quote {
+  max-width: 68ch;
+  margin: 16px 0 0;
+  padding: 14px 18px;
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--surface-2);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+/* ── tabla de proveedores (tarjetas en el celular) ── */
+.legal-table {
+  width: 100%;
+  margin: 16px 0;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.legal-table th,
+.legal-table td {
+  padding: 12px 14px 12px 0;
+  border-top: 1px solid var(--line);
+  color: var(--text-2);
+  font-weight: 400;
+  text-align: left;
+  vertical-align: top;
+}
+
+.legal-table thead th {
+  padding-top: 0;
+  border-top: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.legal-table tbody th {
+  width: 22%;
+}
+
+.legal-table tbody th b {
+  display: block;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.legal-table tbody th small {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ── emergencias ── */
+.legal-emergency {
+  margin-top: 18px;
+  padding: 18px 20px;
+  border-radius: var(--r-lg);
+  background: var(--warning-soft);
+}
+
+.legal-emergency-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--warning-ink);
+}
+
+.legal-emergency-title svg {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+
+.legal .legal-emergency ul {
+  margin-top: 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.legal .legal-emergency :is(li, p) {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.legal-emergency li b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Un número cortado en dos líneas cuesta leerlo y tocarlo: cada uno va entero. */
+.legal-emergency a {
+  white-space: nowrap;
+}
+
+/* ── contacto y pie ── */
+.legal-contact {
+  margin-top: 40px;
+}
+
+.legal-contact .tray-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+}
+
+.legal-contact-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.legal-contact-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.legal .legal-contact p {
+  align-self: center;
+  font-size: 15px;
+}
+
+.legal-foot {
+  grid-area: foot;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+/* ── pantallas anchas: índice fijo a la izquierda ── */
+@media (min-width: 1100px) {
+  .legal-main {
+    grid-template-columns: 250px minmax(0, 760px);
+    grid-template-areas: 'toc head' 'toc doc' 'toc foot';
+    column-gap: 48px;
+    justify-content: center;
+    max-width: calc(1058px + 2 * var(--legal-gutter));
+    padding-top: 40px;
+  }
+
+  .legal-toc {
+    position: sticky;
+    top: 88px;
+    align-self: start;
+    max-height: calc(100dvh - 104px);
+    overflow-y: auto;
+    padding: 6px 0 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+}
+
+/* ── celular ── */
+@media (max-width: 720px) {
+  .legal-table,
+  .legal-table tbody,
+  .legal-table tr,
+  .legal-table th,
+  .legal-table td {
+    display: block;
+    width: auto;
+  }
+
+  .legal-table tbody th {
+    width: auto;
+  }
+
+  .legal-table thead {
+    display: none;
+  }
+
+  .legal-table tr {
+    padding: 14px 16px;
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+  }
+
+  .legal-table tr + tr {
+    margin-top: 10px;
+  }
+
+  .legal-table th,
+  .legal-table td {
+    padding: 0;
+    border: 0;
+  }
+
+  .legal-table td {
+    margin-top: 10px;
+  }
+
+  .legal-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-3);
+  }
+}
+
+@media (max-width: 480px) {
+  .legal-main {
+    gap: 16px;
+    padding-top: 20px;
+  }
+
+  .legal-summary .tray-card,
+  .legal-toc {
+    padding: 18px;
+  }
+
+  .legal-section h2 {
+    font-size: 20px;
+  }
+
+  .legal-doc :is(p, li) {
+    font-size: 15.5px;
+  }
+
+  .legal-emergency {
+    padding: 16px;
+  }
+}
+
+/* ── impresión: el texto solo, en claro ── */
+@media print {
+  html:has(.legal) {
+    scroll-padding-top: 0;
+  }
+
+  .legal {
+    min-height: 0;
+    background: #fff;
+  }
+
+  .legal-main {
+    display: block;
+    max-width: none;
+    padding: 0;
+  }
+
+  .legal-head {
+    margin-bottom: 18px;
+  }
+
+  .legal-title {
+    margin-top: 0;
+  }
+
+  /* Con .legal delante: styles.css va después en el bundle y su .tray ganaría. */
+  .legal .legal-summary,
+  .legal .legal-summary .tray-card {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .legal .legal-summary {
+    margin: 8px 0 20px;
+  }
+
+  .legal .legal-doc {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    break-inside: auto;
+  }
+
+  .legal-section h2,
+  .legal-section h3 {
+    break-after: avoid;
+  }
+
+  .legal-doc :is(p, li) {
+    max-width: none;
+  }
+
+  .legal-table tr,
+  .legal-emergency,
+  .legal-quote {
+    break-inside: avoid;
+  }
+
+  .legal-emergency,
+  .legal-quote {
+    border: 1px solid #ddd;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

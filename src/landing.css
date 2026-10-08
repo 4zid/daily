@@ -180,12 +180,17 @@ html:has(.lp) {
   padding: 8px 4px;
   font-size: 15px;
   color: var(--text-2);
+  text-decoration: none;
   cursor: pointer;
   border-radius: 8px;
   transition: color 0.2s;
 }
 .lp-link:hover {
   color: var(--text);
+}
+/* Los links con esta clase se ven como los botones del pie (.lp button hereda el color). */
+.lp a.lp-link {
+  color: inherit;
 }
 .lp-link-arrow {
   display: inline-flex;
@@ -1729,6 +1734,17 @@ html:has(.lp) {
 .lp-section-dark .lp-kicker {
   color: #a5a5ff;
 }
+/* Sobre el azul oscuro, el anillo de foco azul no se ve: va blanco. */
+.lp-section-dark :focus-visible {
+  outline-color: #fff;
+}
+.lp-priv-more {
+  margin-top: 26px;
+}
+.lp-priv-more .lp-link {
+  margin-left: 36px;
+  padding-left: 0;
+}
 
 /* preguntas */
 .lp-faq {
@@ -1836,6 +1852,14 @@ html:has(.lp) {
   grid-template-rows: 1fr;
   visibility: visible;
   transition-delay: 0s;
+}
+.lp-faq-a a {
+  color: var(--text);
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+.lp-faq-a a:hover {
+  text-decoration-color: currentColor;
 }
 .lp-faq-item.is-open .lp-faq-a p {
   opacity: 1;

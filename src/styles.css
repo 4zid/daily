@@ -3,6 +3,27 @@
    que contienen una card blanca y una fila de acciones, píldoras y
    botones redondos. Acento verde (paciente) y azul eléctrico (terapeuta). */
 
+/* Geist, servida desde la app (public/fonts, licencia OFL en Geist-OFL.txt): así el navegador
+   no le pide la tipografía a un tercero. Variable, de 100 a 900; latín y latín extendido. */
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/geist-latin-ext-wght-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF,
+    U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Geist';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/geist-latin-wght-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   color-scheme: light;
   --font: 'Geist', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -1728,6 +1749,18 @@ svg {
   text-wrap: pretty;
 }
 
+.assistant-privacy {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+
+.assistant-privacy:hover {
+  color: var(--text);
+  text-decoration-color: currentColor;
+}
+
 .hero-sub {
   text-wrap: pretty;
 }
@@ -3144,6 +3177,52 @@ dialog.modal::backdrop {
 .check-field b {
   font-weight: 500;
   color: var(--text);
+}
+
+/* Aviso breve antes de las casillas (art. 6 de la Ley 25.326) y una casilla por cada
+   consentimiento (art. 5: si va con otras declaraciones, expreso y destacado). */
+.consent-field {
+  display: grid;
+  gap: 10px;
+}
+
+.consent-notice {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.consent-notice a {
+  color: inherit;
+  text-underline-offset: 2px;
+}
+
+/* Sin la casilla marcada al enviar: el borde del recuadro avisa además del texto. */
+.check-field input[aria-invalid='true'] {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
+
+/* Links legales al pie del ingreso: en todas las pantallas (login, alta, recuperación). */
+.auth-legal {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 18px;
+  font-size: 13px;
+}
+
+.auth-legal a {
+  padding: 4px 2px;
+  color: var(--text-3);
+  text-decoration: none;
+}
+
+.auth-legal a:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .role-pick {
@@ -4639,6 +4718,26 @@ dialog.modal::backdrop {
 .ob-account {
   gap: 16px;
   padding: 12px 8px 8px 12px;
+}
+
+.ob-legal {
+  display: flex;
+  gap: 4px 14px;
+  margin-left: auto;
+  padding-right: 8px;
+  font-size: 13px;
+}
+
+/* --text-2: con --text-3 no llega al contraste AA sobre la bandeja gris del modo claro. */
+.ob-legal a {
+  color: var(--text-2);
+  text-decoration: none;
+}
+
+.ob-legal a:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* Cambio de paso: lo anterior sale hacia el costado y lo nuevo entra con sus animaciones. */

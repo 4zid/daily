@@ -19,6 +19,7 @@ import { local, useLocal } from '../lib/store';
 import { inviteCodeFrom, navigate } from '../lib/route';
 import { AssistantChat, type ChatMessage } from './AssistantChat';
 import { SettingsDialog, type DemoControls } from './Dialogs';
+import { LegalLink } from './Legal';
 import { PatientView } from './PatientView';
 import { TherapistView } from './TherapistView';
 import { WeekList, mergeWeeks } from './WeekList';
@@ -285,7 +286,7 @@ export function PatientApp({
               <p className="promo-title">
                 Compartís con <b>{therapist === undefined ? 'tu terapeuta' : therapistLabel}</b>
               </p>
-              <p className="promo-text">Ve tus registros a medida que los cargás. Nadie más tiene acceso.</p>
+              <p className="promo-text">Ve tus registros a medida que los cargás. Ningún otro usuario tiene acceso.</p>
               <button
                 type="button"
                 className="promo-btn"
@@ -374,13 +375,21 @@ export function PatientApp({
               <b>{invite.therapistName || 'Un terapeuta'}</b> te invitó a compartir tu registro diario.
             </p>
             <p>
-              Va a poder ver tus actividades, puntajes y reflexiones, pero no cambiarlos.
+              Va a poder ver todo tu registro, también lo que cargaste antes: actividades, puntajes, notas, ánimo y
+              reflexiones, pero no cambiarlo.
               {therapist && therapist !== invite.therapistName ? (
                 <>
                   {' '}
-                  Vas a dejar de compartirlo con <b>{therapist}</b>.
+                  Vas a dejar de compartirlo con <b>{therapist}</b>. Sus notas de sesión sobre vos no se borran: quedan
+                  guardadas sin que nadie las vea, y podés pedir que las borremos.
                 </>
               ) : null}
+            </p>
+            <p>
+              Al aceptar, consentís compartir tus datos de salud con esta persona.{' '}
+              <LegalLink page="privacidad" section="conservacion" newTab className="link-btn">
+                Qué pasa con tus datos
+              </LegalLink>
             </p>
             <div className="row">
               <button type="button" className="btn btn-primary" onClick={() => void confirmInvite()} disabled={accepting}>

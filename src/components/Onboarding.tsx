@@ -23,6 +23,7 @@ import { CATEGORIES, categoryColorVar } from '../lib/categories';
 import { navigate, useHashPath } from '../lib/route';
 import { markOnboardingSeen } from '../lib/store';
 import { Brand, CategoryAvatar, RoundCheck, Scores } from './common';
+import { LegalLink } from './Legal';
 
 // Presentación en pasos para quien llega por primera vez. Las ilustraciones se
 // arman con piezas reales de la app y se animan al entrar a cada paso.
@@ -92,7 +93,7 @@ const STEPS: Step[] = [
         <b>claro y a tiempo.</b>
       </>
     ),
-    text: 'Cada semana se arma un informe con placer, control, ánimo y tus reflexiones. Solo vos y tu terapeuta pueden verlo.',
+    text: 'Cada semana se arma un informe con placer, control, ánimo y tus reflexiones. Ningún otro usuario de daily puede verlo: solo vos y tu terapeuta.',
     tint: ['therapist', 'therapist'],
     Art: ReportArt,
   },
@@ -322,7 +323,7 @@ function Choices({ signedIn, onChoose }: { signedIn: boolean; onChoose: (path: s
             <span className="live-dot" aria-hidden /> Demo
           </span>
           <p className="h3">Probala como invitado</p>
-          <p className="sub">Datos de ejemplo. Lo que cargues no se guarda.</p>
+          <p className="sub">Datos de ejemplo. Lo que cargues no se guarda en daily.</p>
         </div>
         <div className="ob-roles">
           <button type="button" className="ob-role" data-role="patient" onClick={() => onChoose('demo/paciente')}>
@@ -362,6 +363,15 @@ function Choices({ signedIn, onChoose }: { signedIn: boolean; onChoose: (path: s
             </button>
           </>
         )}
+        {/* En otra pestaña: al volver, la presentación arrancaría de nuevo desde el primer paso. */}
+        <nav className="ob-legal" aria-label="Legal">
+          <LegalLink page="privacidad" newTab>
+            Privacidad
+          </LegalLink>
+          <LegalLink page="terminos" newTab>
+            Términos
+          </LegalLink>
+        </nav>
       </div>
     </div>
   );

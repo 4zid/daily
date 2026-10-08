@@ -7,6 +7,7 @@ import { organizeDay, type ChatTurn, type OrganizeResult } from '../lib/organize
 import { actions } from '../lib/cloud';
 import { newId } from '../lib/store';
 import { CategoryAvatar, Menu, MoodIcon, RoundCheck } from './common';
+import { LegalLink } from './Legal';
 
 export type ChatMessage =
   | { id: string; role: 'user'; text: string }
@@ -219,7 +220,13 @@ export function AssistantChat({
         </span>
         <div>
           <h2>Contale tu día</h2>
-          <p>Lo ordeno en actividades y vos revisás antes de guardar.</p>
+          <p>
+            Lo ordeno en actividades y vos revisás antes de guardar.{' '}
+            {/* Aviso en el momento: qué pasa con lo que se escribe acá (otra pestaña: el chat no se pierde). */}
+            <LegalLink page="privacidad" section="ia" newTab className="assistant-privacy">
+              Privacidad
+            </LegalLink>
+          </p>
         </div>
         {onClose && (
           <button type="button" className="circle-btn sm" onClick={onClose} aria-label="Cerrar chat">

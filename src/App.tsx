@@ -7,13 +7,15 @@ import { AuthScreen } from './components/AuthScreen';
 import { DemoApp } from './components/DemoApp';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Landing } from './components/Landing';
+import { LegalPage } from './components/Legal';
 import { Onboarding } from './components/Onboarding';
 import { PatientApp } from './components/PatientApp';
 import { TherapistApp } from './components/TherapistApp';
 import { Brand } from './components/common';
 
 // Rutas: "/" sin sesión es la landing; "#/bienvenida" (presentación), "#/demo/…" (demo como
-// invitado), "#/ingresar", "#/crear-cuenta", "#/invitacion/CÓDIGO", y las de la app.
+// invitado), "#/ingresar", "#/crear-cuenta", "#/invitacion/CÓDIGO", "#/privacidad" y
+// "#/terminos" (páginas legales, para todos), y las de la app.
 
 export default function App() {
   const path = useHashPath();
@@ -50,6 +52,10 @@ function Screens({ path }: { path: string }) {
     markHadSession();
     if (path === 'ingresar' || path === 'crear-cuenta') navigate('', true);
   }, [signedIn, path]);
+
+  // Las páginas legales son públicas: se ven con o sin sesión, mientras carga la cuenta, en la
+  // recuperación de contraseña y sin perfil. Van antes que cualquier redirección.
+  if (path === 'privacidad' || path === 'terminos') return <LegalPage key={path} page={path} />;
 
   if (auth.status === 'loading') {
     return (

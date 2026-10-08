@@ -159,7 +159,8 @@ export function organizeBasic(text: string): OrganizedDay {
       pleasure: findScore(sentence, 'pleasure'),
       control: findScore(sentence, 'control'),
       notes: approximate ? 'Hora aproximada' : undefined,
-      source: 'ia',
+      // El modo básico no usa la IA: la marca «Ordenada con la IA» sería falsa.
+      source: 'manual',
     });
     lastMinutes = timeToMinutes(end ?? start);
   }

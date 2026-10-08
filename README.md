@@ -93,6 +93,8 @@ AI_MODEL=modelo-principal,modelo-de-respaldo    # se prueban en orden
 
 Si `AI_BASE_URL` apunta a otro proveedor, la clave de Groq no se le manda: hace falta `AI_API_KEY`.
 
+La política de privacidad (`src/components/Legal.tsx`) nombra a Groq y a los modelos gpt-oss: si cambiás de proveedor en producción, actualizala antes (tabla de proveedores, transferencias y sección de IA).
+
 ## Publicarlo (Vercel)
 
 1. Importá este repositorio en Vercel (detecta Vite solo).

@@ -28,8 +28,10 @@ import {
   VolumeX,
 } from 'lucide-react';
 import type { Rating } from '../types';
-import { navigate } from '../lib/route';
+import { LEGAL_EMAIL, groqRetentionShort } from '../lib/legal';
+import { navigate, returnScroll } from '../lib/route';
 import { Brand, CategoryAvatar, RatingScale, Scores } from './common';
+import { LegalLink } from './Legal';
 import '../landing.css';
 
 // La landing pública: lo primero que ve quien entra sin sesión. Le habla al
@@ -69,9 +71,10 @@ export function Landing() {
   }, []);
 
   // Al llegar desde otra pantalla (salir de la demo) la landing arranca arriba, y al irse
-  // (demo, alta, ingreso) la pantalla nueva también.
+  // (demo, alta, ingreso) la pantalla nueva también. Al volver de una página legal abierta
+  // desde acá, vuelve a donde estaba.
   useEffect(() => {
-    window.scrollTo(0, 0);
+    window.scrollTo(0, returnScroll() ?? 0);
     return () => window.scrollTo(0, 0);
   }, []);
 
@@ -371,7 +374,7 @@ function Hero() {
               <Check aria-hidden /> Gratis
             </li>
             <li>
-              <Lock aria-hidden /> Registros privados: solo vos y tu paciente
+              <Lock aria-hidden /> Registros privados: los ven tu paciente y vos
             </li>
           </ul>
         </Reveal>
@@ -1120,11 +1123,14 @@ function TwoViews() {
 
 function Privacy() {
   const points = [
-    ['Los registros guardados los ven solo tu paciente y vos.', 'Las reglas de acceso están en la base de datos, no solo en la pantalla.'],
+    [
+      'Entre los usuarios de daily, los registros guardados los ven solo tu paciente y vos.',
+      'Las reglas de acceso están en la base de datos, no solo en la pantalla. Los proveedores que alojan el servicio y su responsable tienen acceso técnico solo para operarlo.',
+    ],
     ['Tu paciente decide sobre sus datos.', 'Puede descargar sus registros o borrar su cuenta cuando quiera.'],
     [
       'Cualquiera de los dos puede terminar el vínculo.',
-      'Si vos o tu paciente lo terminan, o tu paciente borra su cuenta, dejás de ver sus registros y se borran tus notas sobre esa persona.',
+      'Si vos o tu paciente lo terminan, o tu paciente borra su cuenta, dejás de ver sus registros y se borran tus notas sobre esa persona. Si tu paciente se cambia a otro terapeuta, dejás de ver sus registros y tus notas, pero las notas quedan guardadas sin que nadie las vea.',
     ],
     [
       'La IA es opcional y solo ordena el texto.',
@@ -1132,9 +1138,9 @@ function Privacy() {
     ],
     [
       'Qué pasa por servicios externos.',
-      'Si tu paciente usa el chat, el texto se envía a Groq (EE. UU.) para ordenarlo; Groq no lo usa para entrenar modelos. El dictado usa el reconocimiento de voz del navegador (en Chrome, el de Google). Si carga todo a mano, no pasa por ninguno de los dos.',
+      `Si tu paciente usa el chat, el texto pasa por nuestro servidor (Vercel, EE. UU.) y se envía a Groq (EE. UU.) para ordenarlo; Groq ${groqRetentionShort()}. El dictado usa el reconocimiento de voz del navegador (en Chrome, el de Google). Si carga todo a mano, no pasa por ninguno de los dos.`,
     ],
-  ] as const;
+  ];
   return (
     <section className="lp-section lp-section-dark" id="privacidad" aria-labelledby="lp-priv-title">
       <div className="lp-wrap lp-privacy">
@@ -1150,6 +1156,11 @@ function Privacy() {
               </Reveal>
             ))}
           </ul>
+          <Reveal i={points.length + 2} className="lp-priv-more">
+            <LegalLink page="privacidad" className="lp-link lp-link-arrow">
+              Leé la política de privacidad completa <ArrowRight aria-hidden />
+            </LegalLink>
+          </Reveal>
         </div>
         <Reveal i={2} className="lp-priv-art">
           <AccessArt />
@@ -1189,7 +1200,7 @@ function AccessArt() {
 // ─────────────────────────────── preguntas ───────────────────────────────
 
 // La primera pregunta abre sola: cómo carga su día el paciente (lo central de daily).
-const FAQS = [
+const FAQS: [string, ReactNode][] = [
   [
     '¿Cómo carga su día mi paciente?',
     'Desde el celular o la compu, suma cada actividad con horario, qué hizo, categoría y puntajes de placer y control del 1 al 10. También puede anotar comentarios y cómo se sintió en el día. Si prefiere, se lo cuenta a la IA, escrito o dictado, y revisa antes de guardar.',
@@ -1198,11 +1209,30 @@ const FAQS = [
   ['¿Mis pacientes tienen que instalar algo?', 'No. daily funciona en el navegador, en el celular o en la compu. Entran con el link de invitación que les mandás.'],
   [
     '¿Qué hace la IA? ¿Es obligatoria?',
-    'Es opcional. Si tu paciente prefiere contar su día con sus palabras, la IA lo ordena en actividades con horario, categoría y, si los dijo, puntajes de placer y control. No da consejos clínicos ni diagnósticos, y tu paciente revisa todo antes de guardarlo. Si la IA no está disponible, el chat sigue en un modo básico que reconoce horarios y categorías, y siempre se puede cargar a mano.',
+    <>
+      Es opcional. Si tu paciente prefiere contar su día con sus palabras, la IA lo ordena en actividades con horario,
+      categoría y, si los dijo, puntajes de placer y control. No da consejos clínicos ni diagnósticos, y tu paciente revisa
+      todo antes de guardarlo. Si la IA no está disponible, el chat sigue en un modo básico que reconoce horarios y
+      categorías, y siempre se puede cargar a mano. Qué se envía y a quién:{' '}
+      <LegalLink page="privacidad" section="ia">
+        política de privacidad
+      </LegalLink>
+      .
+    </>,
   ],
   [
     '¿Quién puede ver los registros?',
-    'Los registros guardados, solo tu paciente y vos. El texto del chat pasa por el proveedor de IA para ordenarse, sin quedar guardado en daily. Si vos o tu paciente terminan el vínculo, dejás de ver sus registros y se borran tus notas de sesión.',
+    <>
+      Entre los usuarios de daily, los registros guardados los ven solo tu paciente y vos; los proveedores que alojan el
+      servicio y su responsable tienen acceso técnico solo para operarlo. El texto del chat pasa por el proveedor de IA
+      para ordenarse, sin quedar guardado en daily. Si vos o tu paciente terminan el vínculo, dejás de ver sus registros y
+      se borran tus notas de sesión. Si tu paciente se cambia a otro terapeuta, dejás de ver todo, pero tus notas quedan
+      guardadas sin que nadie las vea. Más detalles en la{' '}
+      <LegalLink page="privacidad" section="acceso">
+        política de privacidad
+      </LegalLink>
+      .
+    </>,
   ],
   [
     '¿Me avisa si mi paciente escribe algo de riesgo?',
@@ -1211,9 +1241,9 @@ const FAQS = [
   ['¿Puedo tener varios pacientes?', 'Sí. Cada paciente tiene su informe semanal y su historial de semanas.'],
   [
     '¿Lo puedo probar sin crear una cuenta?',
-    'Sí. La demo te muestra la vista del paciente y la del terapeuta con datos de ejemplo, sin registrarte. En la demo, el chat usa el modo básico, sin IA.',
+    'Sí. La demo te muestra la vista del paciente y la del terapeuta con datos de ejemplo, sin registrarte. Sin cuenta, el chat de la demo usa el modo básico, sin IA.',
   ],
-] as const;
+];
 
 function Faq() {
   const [open, setOpen] = useState<number | null>(0);
@@ -1289,6 +1319,15 @@ function Footer() {
           <button type="button" className="lp-link" onClick={() => navigate('bienvenida')}>
             Presentación
           </button>
+          <LegalLink page="privacidad" className="lp-link">
+            Privacidad
+          </LegalLink>
+          <LegalLink page="terminos" className="lp-link">
+            Términos
+          </LegalLink>
+          <a className="lp-link" href={`mailto:${LEGAL_EMAIL}`}>
+            Contacto
+          </a>
         </nav>
         <small>© 2026 daily · Registro diario de actividades para terapia</small>
       </div>

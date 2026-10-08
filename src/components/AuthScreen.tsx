@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   ArrowRight,
   ChartColumn,
@@ -15,10 +15,12 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { lookupInvitation } from '../lib/cloud';
+import { EMAIL_SENDER, LEGAL_EMAIL, consentKinds, type ConsentKind } from '../lib/legal';
 import { navigate } from '../lib/route';
 import { markOnboardingSeen } from '../lib/store';
 import { authErrorMessage } from '../lib/supabase';
 import { Brand, Initials } from './common';
+import { LegalLink, LegalOwner } from './Legal';
 
 type Mode = 'login' | 'signup' | 'forgot' | 'sent' | 'confirm';
 type Role = 'therapist' | 'patient';
@@ -34,12 +36,12 @@ const POINTS: Record<Role, [LucideIcon, string][]> = {
   patient: [
     [NotebookPen, 'Registrá tus actividades con placer y control, del 1 al 10.'],
     [Sparkles, 'Si preferís, contale tu día a la IA y lo ordena por vos.'],
-    [LockKeyhole, 'Solo vos y tu terapeuta pueden ver tus registros.'],
+    [LockKeyhole, 'Ningún otro usuario de daily ve tus registros: solo vos y tu terapeuta.'],
   ],
   therapist: [
     [Link2, 'Invitá a tus pacientes con un link: su cuenta queda vinculada a la tuya.'],
     [ChartColumn, 'Mirá cada semana: actividades, placer, control y ánimo.'],
-    [LockKeyhole, 'Tus notas de sesión son privadas: el paciente no las ve.'],
+    [LockKeyhole, 'Tus notas de sesión son privadas: tu paciente no las ve en la app.'],
   ],
 };
 
@@ -69,10 +71,16 @@ export function AuthScreen({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [consent, setConsent] = useState(false);
+  // Una casilla por consentimiento (ver consentKinds en lib/legal.ts). Empiezan sin marcar y
+  // se desmarcan si cambia lo aceptado: el rol o la invitación.
+  const [consent, setConsent] = useState<Partial<Record<ConsentKind, boolean>>>({});
+  const [consentError, setConsentError] = useState(false);
+  const consentRefs = useRef<Partial<Record<ConsentKind, HTMLInputElement | null>>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [invite, setInvite] = useState<InviteInfo>({ status: 'idle' });
+  // Sube para volver a buscar la invitación si falló la conexión.
+  const [lookupTry, setLookupTry] = useState(0);
 
   // Quien llega al ingreso ya no necesita la presentación (por ejemplo, desde una
   // invitación): así, después de crear la cuenta, no aparece en lugar del aviso.
@@ -93,6 +101,7 @@ export function AuthScreen({
     setFromLink(true);
     setRole('patient');
     setMode('signup');
+    setConsent({});
   }, [inviteCode]);
 
   // Muestra de quién es la invitación antes de crear la cuenta.
@@ -117,11 +126,12 @@ export function AuthScreen({
       active = false;
       window.clearTimeout(t);
     };
-  }, [code, role]);
+  }, [code, role, lookupTry]);
 
   function go(next: Mode) {
     setMode(next);
     setError('');
+    setConsentError(false);
     setShowPassword(false);
   }
 
@@ -151,18 +161,23 @@ export function AuthScreen({
         await auth.requestPasswordReset(email);
         go('sent');
       });
-    } else if (mode === 'signup' && role === 'therapist') {
-      void run(async () => {
-        const { needsConfirmation } = await auth.signUpTherapist({ name, email, password });
-        if (needsConfirmation) go('confirm');
-      });
     } else if (mode === 'signup') {
-      if (!consent) {
-        setError('Para crear la cuenta tenés que aceptar que tu terapeuta vea tus registros.');
+      // Sin todas las casillas marcadas no se crea la cuenta: el aviso queda junto a ellas.
+      const missing = consentKinds(role).filter((kind) => !consent[kind]);
+      if (missing.length) {
+        setConsentError(true);
+        consentRefs.current[missing[0]]?.focus();
+        return;
+      }
+      if (role === 'therapist') {
+        void run(async () => {
+          const { needsConfirmation } = await auth.signUpTherapist({ name, email, password, consent: true });
+          if (needsConfirmation) go('confirm');
+        });
         return;
       }
       void run(async () => {
-        const { needsConfirmation } = await auth.signUpPatient({ name, email, password, code });
+        const { needsConfirmation } = await auth.signUpPatient({ name, email, password, code, consent: true });
         // La invitación ya se usó: la URL deja de apuntar a ella.
         if (inviteCode) navigate('registro', true);
         if (needsConfirmation) go('confirm');
@@ -341,8 +356,10 @@ export function AuthScreen({
                 aria-checked={role === value}
                 className="role-option"
                 onClick={() => {
+                  if (value !== role) setConsent({});
                   setRole(value);
                   setError('');
+                  setConsentError(false);
                 }}
               >
                 <Icon aria-hidden />
@@ -364,7 +381,9 @@ export function AuthScreen({
             onCode={(value) => {
               setCode(cleanCode(value));
               setFromLink(false);
+              setConsent({});
             }}
+            onRetry={() => setLookupTry((n) => n + 1)}
           />
         )}
 
@@ -385,17 +404,77 @@ export function AuthScreen({
         {emailField}
         {passwordField('Contraseña', 'new-password', `Al menos ${MIN_PASSWORD} caracteres.`)}
 
-        {role === 'patient' && (
-          <label className="check-field">
-            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-            <span>
-              Entiendo que <b>{therapistName || 'mi terapeuta'}</b> va a poder ver las actividades, puntajes y reflexiones
-              que registre.
-            </span>
-          </label>
-        )}
+        <div className="consent-field">
+          {/* Lo que pide el art. 6 de la Ley 25.326 antes de recolectar los datos, en corto. */}
+          <p className="consent-notice">
+            Responsable de tus datos: <LegalOwner />, <a href={`mailto:${LEGAL_EMAIL}`}>{LEGAL_EMAIL}</a>. Los usamos para{' '}
+            {role === 'patient'
+              ? 'llevar tu registro y compartirlo con tu terapeuta'
+              : 'manejar tu cuenta, guardar tus notas de sesión y mostrarte el informe de tus pacientes'}
+            ; los guardan y procesan {consentProviders('vos')}. Son obligatorios el email, la contraseña, el nombre
+            {role === 'patient' ? ' y el código de invitación' : ''}: sin ellos no se puede crear la cuenta. Podés pedir
+            acceso, corrección o supresión de tus datos por email. Detalles en la{' '}
+            <LegalLink page="privacidad" newTab>
+              Política de privacidad
+            </LegalLink>
+            .
+          </p>
+          {/* Una casilla por consentimiento, cada una con lo que se acepta destacado (art. 5).
+              Sin "required": la validación del navegador taparía el aviso en castellano de abajo.
+              Los links abren otra pestaña para no perder lo que ya se completó. */}
+          {consentKinds(role).map((kind) => (
+            <label key={kind} className="check-field">
+              <input
+                ref={(el) => {
+                  consentRefs.current[kind] = el;
+                }}
+                type="checkbox"
+                checked={consent[kind] ?? false}
+                onChange={(e) => {
+                  const next = { ...consent, [kind]: e.target.checked };
+                  setConsent(next);
+                  if (consentKinds(role).every((k) => next[k])) setConsentError(false);
+                }}
+                aria-invalid={(consentError && !consent[kind]) || undefined}
+                aria-describedby={consentError && !consent[kind] ? `${ids}-consent-error` : undefined}
+              />
+              <span>
+                {kind === 'terminos' ? (
+                  <>
+                    Soy mayor de 18 años y acepto los{' '}
+                    <LegalLink page="terminos" newTab className="link-btn">
+                      Términos
+                    </LegalLink>{' '}
+                    y la{' '}
+                    <LegalLink page="privacidad" newTab className="link-btn">
+                      Política de privacidad
+                    </LegalLink>
+                    .
+                  </>
+                ) : kind === 'salud' ? (
+                  <>
+                    <b>Consiento que daily trate mis datos de salud</b> (lo que cargue en mi registro y las notas de sesión
+                    que mi terapeuta escriba sobre mí) <b>y que {therapistName || 'mi terapeuta'} vea mi registro</b>.
+                  </>
+                ) : (
+                  <>
+                    <b>Acepto que mis datos se guarden en Brasil y se procesen en EE. UU.</b> ({consentProviders('yo')}),
+                    países que la autoridad argentina no considera con un nivel de protección adecuado.
+                  </>
+                )}
+              </span>
+            </label>
+          ))}
+          {consentError && (
+            <p id={`${ids}-consent-error`} className="form-error" role="alert">
+              Para crear la cuenta tenés que marcar las {consentKinds(role).length === 3 ? 'tres' : 'dos'} casillas.
+            </p>
+          )}
+        </div>
 
-        <SubmitButton busy={busy} disabled={role === 'patient' && (invite.status === 'invalid' || !code)}>
+        {/* El paciente crea la cuenta solo con la invitación verificada: así la casilla de salud
+            nombra a quién va a ver su registro. */}
+        <SubmitButton busy={busy} disabled={role === 'patient' && invite.status !== 'valid'}>
           Crear cuenta
         </SubmitButton>
       </>
@@ -472,9 +551,24 @@ export function AuthScreen({
             </span>
           </div>
         )}
+        <nav className="auth-legal" aria-label="Legal">
+          <LegalLink page="privacidad" newTab>
+            Privacidad
+          </LegalLink>
+          <LegalLink page="terminos" newTab>
+            Términos
+          </LegalLink>
+          <a href={`mailto:${LEGAL_EMAIL}`}>Contacto</a>
+        </nav>
       </main>
     </div>
   );
+}
+
+/** Quién guarda y procesa los datos, para el aviso y la casilla de la transferencia. */
+function consentProviders(voice: 'vos' | 'yo'): string {
+  const list = ['Supabase', 'Vercel', ...(EMAIL_SENDER ? [EMAIL_SENDER.name] : [])];
+  return `${list.join(', ')} y, si ${voice === 'vos' ? 'usás' : 'uso'} el chat, Groq`;
 }
 
 function SubmitButton({ busy, disabled, children }: { busy: boolean; disabled?: boolean; children: ReactNode }) {
@@ -492,12 +586,14 @@ function InviteBlock({
   invite,
   inputId,
   onCode,
+  onRetry,
 }: {
   code: string;
   fromLink: boolean;
   invite: InviteInfo;
   inputId: string;
   onCode: (value: string) => void;
+  onRetry: () => void;
 }) {
   const showInput = !fromLink || invite.status === 'invalid';
   return (
@@ -535,7 +631,15 @@ function InviteBlock({
           Esta invitación no es válida, venció o ya se usó. Pedile a tu terapeuta un link nuevo.
         </p>
       )}
-      {invite.status === 'error' && <p className="form-hint">No pude verificar la invitación. Igual podés crear la cuenta.</p>}
+      {invite.status === 'error' && (
+        <p className="form-error">
+          No pude verificar la invitación. Revisá tu conexión y{' '}
+          <button type="button" className="link-btn" onClick={onRetry}>
+            probá de nuevo
+          </button>
+          .
+        </p>
+      )}
       {invite.status === 'idle' && !fromLink && (
         <p className="form-hint">Si tu terapeuta te mandó un link, abrilo y el código se completa solo.</p>
       )}

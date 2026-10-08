@@ -53,6 +53,7 @@ export function DemoApp({ path, signedIn }: { path: string; signedIn: boolean })
     onReset: reset,
     onExit: exit,
     exitLabel: signedIn ? 'Volver a mi cuenta' : 'Salir de la demo',
+    signedIn,
   };
 
   if (!ready) return null;

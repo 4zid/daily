@@ -10,9 +10,11 @@ import {
   inviteUrl,
   type Invitation,
 } from '../lib/cloud';
+import { LEGAL_EMAIL, groqRetentionShort } from '../lib/legal';
 import { buildBackup, local, useLocal } from '../lib/store';
 import { authErrorMessage, type Profile } from '../lib/supabase';
 import { Modal, copyText, downloadJson } from './common';
+import { LegalLink } from './Legal';
 
 const THEMES = [
   ['system', 'Sistema'],
@@ -25,6 +27,8 @@ export interface DemoControls {
   onReset: () => void;
   onExit: () => void;
   exitLabel: string;
+  /** Con la sesión iniciada, el chat de la demo usa la IA (sin sesión, el modo básico). */
+  signedIn: boolean;
 }
 
 interface SettingsProps {
@@ -60,14 +64,40 @@ function ThemePicker() {
   );
 }
 
+/** Links a las páginas legales. En otra pestaña: así no se pierde la demo ni el chat abierto. */
+function LegalSection() {
+  return (
+    <div className="modal-section">
+      <h3>Privacidad y condiciones</h3>
+      <p>
+        Qué datos guarda daily, quién los ve y cómo pedir una copia o que se borren. Consultas:{' '}
+        <a className="link-btn" href={`mailto:${LEGAL_EMAIL}`}>
+          {LEGAL_EMAIL}
+        </a>
+        .
+      </p>
+      <div className="row">
+        <LegalLink page="privacidad" newTab className="btn btn-sm">
+          Privacidad
+        </LegalLink>
+        <LegalLink page="terminos" newTab className="btn btn-sm">
+          Términos
+        </LegalLink>
+      </div>
+    </div>
+  );
+}
+
 function DemoSettings({ open, demo, onClose }: SettingsProps & { demo: DemoControls }) {
   return (
     <Modal open={open} title="Ajustes" onClose={onClose}>
       <div className="modal-section">
         <h3>Estás en la demo</h3>
         <p>
-          Todo lo que ves son datos de ejemplo. Lo que cargues no se guarda en ningún lado y se borra al recargar la
-          página o al reiniciar la demo.
+          Todo lo que ves son datos de ejemplo. Lo que cargues no se guarda en daily y se borra al recargar la página o al
+          reiniciar la demo.
+          {demo.signedIn &&
+            ` Como tenés la sesión iniciada, el chat usa la IA: lo que le escribas se envía a Groq para ordenarlo, y Groq ${groqRetentionShort()}.`}
         </p>
         <div className="row">
           <button
@@ -87,6 +117,7 @@ function DemoSettings({ open, demo, onClose }: SettingsProps & { demo: DemoContr
         </div>
       </div>
       <ThemePicker />
+      <LegalSection />
     </Modal>
   );
 }
@@ -190,8 +221,8 @@ function AccountSettings({ open, profile, therapistName, onEndLink, onClose, onT
           ) : (
             <>
               <p>
-                Compartís tu registro con <b>{therapistName || 'tu terapeuta'}</b>: ve tus actividades, puntajes y reflexiones,
-                pero no puede cambiarlos.
+                Compartís tu registro con <b>{therapistName || 'tu terapeuta'}</b>: ve todo tu registro (actividades,
+                puntajes, notas, ánimo y reflexiones), también lo anterior, pero no puede cambiarlo.
               </p>
               {onEndLink && (
                 <div className="row">
@@ -247,6 +278,8 @@ function AccountSettings({ open, profile, therapistName, onEndLink, onClose, onT
           </button>
         </div>
       </form>
+
+      <LegalSection />
 
       <div className="modal-section">
         <div className="row">
@@ -353,7 +386,7 @@ export function InviteDialog({
         <div className="modal-section share-box">
           <h3>Link para {created.patient_label || 'tu paciente'}</h3>
           <p>
-            Con este link crea su cuenta y queda vinculada a la tuya. Sirve para una sola cuenta y vence el{' '}
+            Con este link crea su cuenta y queda vinculada a la tuya. Mandáselo solo a esa persona: vence el{' '}
             {formatShort(created.expires_at)}.
           </p>
           {demo && <p className="demo-note">En la demo, el link es de ejemplo: no crea cuentas.</p>}
@@ -398,7 +431,7 @@ export function InviteDialog({
             lo que registre.
           </p>
           <div className="field">
-            <label htmlFor={`${ids}-label`}>¿A quién invitás? (opcional, solo lo ves vos)</label>
+            <label htmlFor={`${ids}-label`}>¿A quién invitás? (opcional; la primera palabra va en el saludo del mensaje)</label>
             <div className="inline-field">
               <input
                 id={`${ids}-label`}
