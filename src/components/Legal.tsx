@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { Fragment, createContext, useContext, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowUp, LifeBuoy, Mail, X } from 'lucide-react';
 import {
   EMAIL_SENDER,
@@ -267,8 +267,34 @@ export function LegalPage({ page }: { page: LegalPath }) {
 
 // ─────────────────────────────── piezas de texto ───────────────────────────────
 
-/** El responsable, con el CUIT y el domicilio si ya están cargados en src/lib/legal.ts. */
-export function LegalOwner() {
+/** El responsable, con el CUIT y el domicilio si ya están cargados en src/lib/legal.ts.
+ *  `compact`: separados por puntos, para el aviso corto del alta. */
+export function LegalOwner({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    // El espacio duro antes de cada punto: así una línea nunca empieza con «·». El CUIT y cada
+    // parte del domicilio no se cortan (el CUIT se partía en el guion).
+    return (
+      <>
+        <b>{LEGAL_OWNER}</b>
+        {LEGAL_CUIT ? (
+          <>
+            {'\u00a0'}· <span className="nowrap">CUIT {LEGAL_CUIT}</span>
+          </>
+        ) : null}
+        {LEGAL_ADDRESS ? (
+          <>
+            {'\u00a0'}·{' '}
+            {LEGAL_ADDRESS.split(', ').map((part, i) => (
+              <Fragment key={i}>
+                {i > 0 && ', '}
+                <span className="nowrap">{part}</span>
+              </Fragment>
+            ))}
+          </>
+        ) : null}
+      </>
+    );
+  }
   return (
     <>
       <b>{LEGAL_OWNER}</b> ({LEGAL_COUNTRY}
@@ -466,8 +492,8 @@ const PRIVACY: LegalDoc = {
     </>,
     <>No mostramos publicidad, no vendemos datos, no armamos perfiles y no los usamos para entrenar IA.</>,
     <>
-      Los datos se guardan en <b>Brasil</b> (Supabase) y pasan por <b>Estados Unidos</b> (Vercel y, si usás el chat
-      con IA, Groq).
+      Los datos se guardan en <b>Brasil</b> (Supabase) y pasan por <b>Estados Unidos</b> (Vercel
+      {EMAIL_SENDER ? <>, {EMAIL_SENDER.name}</> : null} y, si usás el chat con IA, Groq).
     </>,
     <>
       Podés descargar tus registros, dejar de compartirlos y borrar tu cuenta desde la app. Para cualquier otro pedido,

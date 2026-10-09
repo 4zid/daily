@@ -24,17 +24,17 @@ export const LEGAL_RNBD: string | null = null;
 // SMTP propio, por ejemplo Resend, va acá su nombre y dónde procesa los datos: aparece solo en
 // la tabla de proveedores y entre lo que se procesa en EE. UU. (si está en otro país, hay que
 // revisar también la sección de transferencias y las casillas del alta).
-export const EMAIL_SENDER: { name: string; where: string } | null = null;
+export const EMAIL_SENDER: { name: string; where: string } | null = { name: 'Resend', where: 'EE. UU. e Irlanda (Unión Europea)' };
 
 /** Desde cuándo valen los textos. */
-export const LEGAL_EFFECTIVE = '8 de octubre de 2026';
-export const LEGAL_EFFECTIVE_ISO = '2026-10-08';
+export const LEGAL_EFFECTIVE = '9 de octubre de 2026';
+export const LEGAL_EFFECTIVE_ISO = '2026-10-09';
 
 // Versión de los Términos y la Política de privacidad. Se guarda con el consentimiento de
 // cada cuenta. Si los textos cambian, se sube (y se actualiza la fecha de arriba). Todavía no
 // hay una pantalla que les pida la versión nueva a las cuentas que aceptaron otra: antes de
 // publicar un cambio hay que sumarla, porque los textos prometen pedir la aceptación expresa.
-export const TERMS_VERSION = '2026-10-08';
+export const TERMS_VERSION = '2026-10-09';
 
 // Retención cero de datos en Groq (el proveedor de la IA del chat), activada en la consola
 // de Groq (Settings → Data Controls → Zero Data Retention: "Global ZDR: Enabled"). Sin ella,
