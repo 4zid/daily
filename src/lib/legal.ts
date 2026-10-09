@@ -26,6 +26,17 @@ export const LEGAL_RNBD: string | null = null;
 // revisar también la sección de transferencias y las casillas del alta).
 export const EMAIL_SENDER: { name: string; where: string } | null = { name: 'Resend', where: 'EE. UU. e Irlanda (Unión Europea)' };
 
+// Las dos leyendas para los titulares de los datos: el derecho de acceso gratis cada seis meses
+// (art. 14, inc. 3 de la Ley 25.326; es la leyenda de la Disposición DNPDP 10/2008, que derogó
+// la Resolución AAIP 14/2018, y la mantenemos) y la autoridad de control que atiende los
+// reclamos (el texto de la Resolución AAIP 14/2018). Van citadas en la política, al pie de la
+// landing y al pie del alta, y salen de acá para que las tres digan exactamente lo mismo. Son
+// textuales: no se corrigen ni se acortan (tampoco el «Nº» de la primera y el «N°» de la segunda).
+export const ACCESS_LEGEND =
+  'El titular de los datos personales tiene la facultad de ejercer el derecho de acceso a los mismos en forma gratuita a intervalos no inferiores a seis meses, salvo que se acredite un interés legítimo al efecto conforme lo establecido en el artículo 14, inciso 3 de la Ley Nº 25.326.';
+export const AAIP_LEGEND =
+  'La AGENCIA DE ACCESO A LA INFORMACIÓN PÚBLICA, en su carácter de Órgano de Control de la Ley N° 25.326, tiene la atribución de atender las denuncias y reclamos que interpongan quienes resulten afectados en sus derechos por incumplimiento de las normas vigentes en materia de protección de datos personales.';
+
 /** Desde cuándo valen los textos. */
 export const LEGAL_EFFECTIVE = '9 de octubre de 2026';
 export const LEGAL_EFFECTIVE_ISO = '2026-10-09';

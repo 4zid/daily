@@ -28,7 +28,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import type { Rating } from '../types';
-import { LEGAL_EMAIL, groqRetentionShort } from '../lib/legal';
+import { AAIP_LEGEND, ACCESS_LEGEND, LEGAL_EMAIL, groqRetentionShort } from '../lib/legal';
 import { navigate, returnScroll } from '../lib/route';
 import { Brand, CategoryAvatar, RatingScale, Scores } from './common';
 import { LegalLink } from './Legal';
@@ -1330,6 +1330,12 @@ function Footer() {
           </a>
         </nav>
         <small>© 2026 daily · Registro diario de actividades para terapia</small>
+        {/* Las dos leyendas de datos personales: las mismas de la política y del alta (ver
+            lib/legal.ts). */}
+        <div className="lp-footer-legal">
+          <p>{ACCESS_LEGEND}</p>
+          <p>{AAIP_LEGEND}</p>
+        </div>
       </div>
     </footer>
   );

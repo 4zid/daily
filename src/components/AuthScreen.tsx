@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { lookupInvitation } from '../lib/cloud';
-import { EMAIL_SENDER, LEGAL_EMAIL, consentKinds, type ConsentKind } from '../lib/legal';
+import { AAIP_LEGEND, ACCESS_LEGEND, EMAIL_SENDER, LEGAL_EMAIL, consentKinds, type ConsentKind } from '../lib/legal';
 import { navigate } from '../lib/route';
 import { markOnboardingSeen } from '../lib/store';
 import { authErrorMessage } from '../lib/supabase';
@@ -614,8 +614,16 @@ export function AuthScreen({
     );
   }
 
+  // El alta: dos columnas en pantallas anchas y las leyendas de datos personales al pie (ver
+  // lib/legal.ts).
+  const signup = !recovery && mode === 'signup';
+  // La invitación a la demo. Mientras espera el email, la pantalla queda solo con lo que hay que
+  // hacer. Tampoco va en el alta del paciente, que ya tiene una invitación (con el link tampoco
+  // aparecía): su alta es la más larga, y sin la demo las leyendas del pie entran sin scroll.
+  const showDemo = !inviteCode && !recovery && mode !== 'confirm' && mode !== 'sent' && !(signup && role === 'patient');
+
   return (
-    <AuthLayout role={accentRole} heading={heading} wide={!recovery && mode === 'signup'}>
+    <AuthLayout role={accentRole} heading={heading} wide={signup} legends={signup}>
       <div className="tray auth-tray">
         <form className="tray-card auth-form" onSubmit={submit} noValidate={false}>
           {title && (
@@ -629,8 +637,7 @@ export function AuthScreen({
         </form>
         {foot && <div className="tray-foot auth-foot">{foot}</div>}
       </div>
-      {/* Mientras espera el email, la pantalla queda solo con lo que hay que hacer. */}
-      {!inviteCode && !recovery && mode !== 'confirm' && mode !== 'sent' && (
+      {showDemo && (
         <div className="auth-demo">
           <span className="auth-demo-text">
             <b>¿Querés ver cómo funciona?</b> Probala con datos de ejemplo, sin cuenta.
@@ -652,16 +659,20 @@ export function AuthScreen({
 
 /** El marco de las pantallas de cuenta: el panel con la marca y lo que ofrece daily para cada
  *  rol (en el celular no está) y la columna con la pantalla y los links legales. `wide`: el
- *  alta, que en pantallas anchas va en dos columnas y le saca lugar al panel. */
+ *  alta, que en pantallas anchas va en dos columnas y le saca lugar al panel. `legends`: las
+ *  leyendas de datos personales al pie (ver lib/legal.ts), para los formularios que recolectan
+ *  datos (el alta). */
 export function AuthLayout({
   role,
   heading,
   wide = false,
+  legends = false,
   children,
 }: {
   role: Role;
   heading?: ReactNode;
   wide?: boolean;
+  legends?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -696,15 +707,24 @@ export function AuthLayout({
           <Brand />
         </div>
         {children}
-        <nav className="auth-legal" aria-label="Legal">
-          <LegalLink page="privacidad" newTab>
-            Privacidad
-          </LegalLink>
-          <LegalLink page="terminos" newTab>
-            Términos
-          </LegalLink>
-          <a href={`mailto:${LEGAL_EMAIL}`}>Contacto</a>
-        </nav>
+        <footer className="auth-fine">
+          <nav className="auth-legal" aria-label="Legal">
+            <LegalLink page="privacidad" newTab>
+              Privacidad
+            </LegalLink>
+            <LegalLink page="terminos" newTab>
+              Términos
+            </LegalLink>
+            <a href={`mailto:${LEGAL_EMAIL}`}>Contacto</a>
+          </nav>
+          {/* Textuales y siempre a la vista, en letra chica: las mismas de la política y de la
+              landing. Un solo párrafo, que ocupa un renglón menos que dos. */}
+          {legends && (
+            <p className="auth-legends">
+              {ACCESS_LEGEND} {AAIP_LEGEND}
+            </p>
+          )}
+        </footer>
       </main>
     </div>
   );

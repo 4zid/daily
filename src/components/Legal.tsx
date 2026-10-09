@@ -1,6 +1,8 @@
 import { Fragment, createContext, useContext, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowUp, LifeBuoy, Mail, X } from 'lucide-react';
 import {
+  AAIP_LEGEND,
+  ACCESS_LEGEND,
   EMAIL_SENDER,
   GROQ_ZDR,
   LEGAL_ADDRESS,
@@ -975,11 +977,9 @@ const PRIVACY: LegalDoc = {
             Respondemos los pedidos de acceso dentro de los <b>10 días corridos</b>, y los de corrección, actualización o
             supresión dentro de los <b>5 días hábiles</b>, como fija la ley. No te cobramos por ejercer tus derechos.
           </p>
-          <Quote>
-            El titular de los datos personales tiene la facultad de ejercer el derecho de acceso a los mismos en forma
-            gratuita a intervalos no inferiores a seis meses, salvo que se acredite un interés legítimo al efecto conforme lo
-            establecido en el artículo 14, inciso 3 de la Ley Nº 25.326.
-          </Quote>
+          {/* Las dos leyendas de datos personales salen de lib/legal.ts: son las mismas del pie de
+              la landing y del alta. */}
+          <Quote>{ACCESS_LEGEND}</Quote>
           <p>
             Si no te respondemos a tiempo o la respuesta no te conforma, podés reclamar ante la autoridad de control (
             <SectionRef page="privacidad" id="aaip" />).
@@ -1003,11 +1003,7 @@ const PRIVACY: LegalDoc = {
             </a>
             .
           </p>
-          <Quote>
-            La AGENCIA DE ACCESO A LA INFORMACIÓN PÚBLICA, en su carácter de Órgano de Control de la Ley N° 25.326, tiene la
-            atribución de atender las denuncias y reclamos que interpongan quienes resulten afectados en sus derechos por
-            incumplimiento de las normas vigentes en materia de protección de datos personales.
-          </Quote>
+          <Quote>{AAIP_LEGEND}</Quote>
         </>
       ),
     },
