@@ -1,8 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { isAuthRetryableFetchError, type Session } from '@supabase/supabase-js';
+import { isAuthRetryableFetchError, type Session, type User } from '@supabase/supabase-js';
 import { hasAuthCode, startupLink, type EmailLinkType, type StartupLink } from './emailLink';
 import { consentMetadata } from './legal';
 import { authRedirectUrl, supabase, type Profile } from './supabase';
+
+// Con la confirmación de email prendida, si el email ya tiene cuenta Supabase responde como si
+// la creara (para no revelar quién está registrado) pero no manda ningún email: devuelve el
+// usuario sin identidades. Sin esto, la pantalla pediría confirmar un email que nunca llega.
+function assertNewAccount(user: User | null) {
+  if (user && user.identities?.length === 0) throw new Error('User already registered');
+}
 
 type Status = 'loading' | 'signed-out' | 'signed-in' | 'no-profile' | 'recovery';
 
@@ -193,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
         if (error) throw error;
+        assertNewAccount(data.user);
         return { needsConfirmation: !data.session };
       },
       async signUpPatient({ name, email, password, code }) {
@@ -210,6 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         });
         if (error) throw error;
+        assertNewAccount(data.user);
         return { needsConfirmation: !data.session };
       },
       async signOut() {

@@ -33,7 +33,7 @@ export function authErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? '');
   const m = message.toLowerCase();
   if (m.includes('invalid login credentials')) return 'El email o la contraseña no son correctos.';
-  if (m.includes('already registered') || m.includes('already been registered')) return 'Ya existe una cuenta con ese email.';
+  if (m.includes('already registered') || m.includes('already been registered')) return 'Ya existe una cuenta con ese email. Ingresá con tu contraseña o recuperala con «¿Olvidaste tu contraseña?».';
   if (m.includes('email not confirmed')) return 'Tenés que confirmar tu email antes de entrar. Revisá tu casilla.';
   if (m.includes('database error saving new user')) return 'La invitación no es válida, venció o ya se usó. Pedile a tu terapeuta una nueva.';
   if (m.includes('invitacion_invalida')) return 'La invitación no es válida, venció o ya se usó. Pedile a tu terapeuta una nueva.';
