@@ -5,7 +5,7 @@ Esta carpeta tiene los emails que manda daily cuando alguien crea su cuenta, cam
 - el botón del email lleva a daily (y no a `localhost:3000`, como pasa hoy);
 - el link funciona **en cualquier dispositivo**: la cuenta se crea en la compu y se confirma desde el celular;
 - los emails llegan a cualquier persona (hoy Supabase solo se los manda a los miembros de tu equipo, y como mucho unos pocos por hora);
-- salen con la marca de daily, desde una dirección de `pantufla.design`.
+- salen con la marca de daily, desde `daily.pantufla.design`: un subdominio solo para daily, así su reputación no depende de otros envíos de `pantufla.design` (si esos envíos reciben quejas, los de daily no caen en Spam por eso).
 
 Todo se hace desde los paneles de Supabase y Resend, sin tocar código. Son unos 20 minutos.
 
@@ -26,7 +26,7 @@ Los links de abajo abren directo la página de tu proyecto en Supabase (`kiifoch
 
 Publicá estos cambios en Vercel como siempre (cuando se suben a la rama de producción, Vercel los publica solo). Para saber si ya está:
 
-- abrí https://daily-nine-ruddy.vercel.app/email/daily-mark.png: tiene que verse el círculo verde de daily. Es el logo que usan los emails.
+- abrí https://daily.pantufla.design/email/daily-mark.png: tiene que verse el círculo verde de daily. Es el logo que usan los emails (los emails lo toman de la Site URL del paso 1).
 
 ## Paso 1. Que los links vuelvan a daily (URL Configuration)
 
@@ -35,31 +35,48 @@ Abrí **[Authentication → URL Configuration](https://supabase.com/dashboard/pr
 1. En **Site URL** borrá `http://localhost:3000` y escribí, **sin barra al final**:
 
    ```
-   https://daily-nine-ruddy.vercel.app
+   https://daily.pantufla.design
    ```
 
    Tocá **Save**. Esta es la causa de que hoy el botón del email lleve a `localhost:3000`: Supabase manda ahí cuando no conoce la dirección de la app.
 
-2. En **Redirect URLs** tocá **Add URL** y agregá estas tres (una por vez):
+2. En **Redirect URLs** tocá **Add URL** y agregá estas cuatro (una por vez; si alguna ya está, dejala):
 
    ```
+   https://daily.pantufla.design/**
    https://daily-nine-ruddy.vercel.app/**
    http://localhost:5173/**
    http://localhost:4173/**
    ```
 
-   La primera es la app publicada. Las otras dos sirven para probar daily en una compu (`npm run dev` y `npm run preview`); no abren nada para nadie más. Los `/**` del final dejan pasar cualquier página de esa dirección.
+   La primera es la dirección de la app. La segunda es la dirección vieja de Vercel, que sigue andando. Las otras dos sirven para probar daily en una compu (`npm run dev` y `npm run preview`); no abren nada para nadie más. Los `/**` del final dejan pasar cualquier página de esa dirección.
 
 Solo con este paso los emails de siempre de Supabase ya llevan a daily, pero inician sesión únicamente en el mismo navegador donde se creó la cuenta: abiertos en otro (por ejemplo, en el celular), la cuenta queda confirmada y la persona tiene que ingresar con su contraseña. Eso lo arregla el paso 4.
 
 ## Paso 2. Mandar los emails con Resend (SMTP)
 
-El envío que trae Supabase es de prueba: solo le llega a quien es miembro de tu equipo en Supabase y manda muy pocos por hora. Para el lanzamiento hace falta un servicio de envío propio. Usamos **Resend**, donde `pantufla.design` ya está verificado.
+El envío que trae Supabase es de prueba: solo le llega a quien es miembro de tu equipo en Supabase y manda muy pocos por hora. Para el lanzamiento hace falta un servicio de envío propio. Usamos **Resend**, con el subdominio `daily.pantufla.design` (región Irlanda, `eu-west-1`).
+
+### 2.0. Los registros DNS del subdominio (ya cargados en Namecheap)
+
+Para referencia, por si algún día hay que revisarlos. Van en **Namecheap → pantufla.design → Advanced DNS → Host Records**; el portfolio en `pantufla.design` y el reenvío de `hola@pantufla.design` no se tocan.
+
+| Tipo | Host | Valor | Para qué |
+|---|---|---|---|
+| CNAME | `daily` | `6981050be13d72b8.vercel-dns-017.com` | la app (Vercel) |
+| TXT | `resend._domainkey.daily` | la clave DKIM que muestra Resend (empieza con `p=MIGf…`) | firma de los emails |
+| CNAME | `send.daily` | `send.forge.rmta.net` | rebotes y SPF |
+| CNAME | `rsend.daily` | `send.forge.rmta.net` | rebotes y SPF |
+| TXT | `_dmarc.daily` | `v=DMARC1; p=none;` | política DMARC |
+
+Resend muestra además un **MX** y un **TXT** para `send.daily`. No se cargan: con **Mail Settings → Email Forwarding**, Namecheap no deja agregar MX (y cambiar ese modo corta el reenvío de `hola@pantufla.design`). El CNAME de `send.daily` los reemplaza: Resend publica el MX y el SPF del otro lado, igual que en `pantufla.design`.
 
 ### 2.1. Crear la clave en Resend
 
 1. Entrá a [resend.com](https://resend.com) → **API Keys** → **Create API Key**.
-2. Nombre: `supabase-daily`. **Permission**: **Sending access**. **Domain**: `pantufla.design` (así la clave solo puede mandar emails desde ese dominio y no puede leer ni cambiar nada de tu cuenta).
+2. Nombre: `supabase-daily`. **Permission**: **Sending access**. **Domain**: `daily.pantufla.design` (así la clave solo puede mandar emails desde ese subdominio y no puede leer ni cambiar nada de tu cuenta).
+
+   Si ya habías creado una clave limitada a `pantufla.design`, creá esta nueva y reemplazala en Supabase (paso 2.2): una clave limitada a un dominio no puede mandar desde otro. Después borrá la vieja en Resend.
 3. Copiá la clave (empieza con `re_`). Resend la muestra **una sola vez**.
 
 > La clave es como una contraseña: pegala directo en Supabase (paso siguiente) y no se la pases a nadie, tampoco por chat. Si alguna vez se filtra, borrala en Resend y creá otra.
@@ -73,7 +90,7 @@ Abrí **[Authentication → Emails → SMTP Settings](https://supabase.com/dashb
 
    | Campo | Valor |
    |---|---|
-   | **Sender email** | `hola@pantufla.design` |
+   | **Sender email** | `no-responder@daily.pantufla.design` |
    | **Sender name** | `daily` |
    | **Host** | `smtp.resend.com` |
    | **Port number** | `465` |
@@ -84,11 +101,11 @@ Abrí **[Authentication → Emails → SMTP Settings](https://supabase.com/dashb
 
 3. Tocá **Save**.
 
-Sobre la dirección: `hola@pantufla.design` es la del contacto que aparece en los emails, así que si alguien responde, te llega a vos. Si preferís que no respondan, usá `no-responder@pantufla.design` (tiene que ser de `pantufla.design`, el dominio verificado en Resend).
+Sobre la dirección: tiene que ser de `daily.pantufla.design`, el subdominio verificado en Resend. Ese subdominio no recibe emails, así que una respuesta a `no-responder@` no llega a ningún lado; por eso el pie de cada email dice que escriban a `hola@pantufla.design`.
 
 ### 2.3. Revisar que Resend no cambie los links
 
-En Resend → **Domains** → `pantufla.design` → **Configuration**, fijate que el seguimiento de clics y de aperturas (**click tracking** / **open tracking**) esté **apagado**. Viene apagado. Si se prende, Resend reemplaza los links del email por los suyos y Supabase avisa que así los links de confirmación dejan de funcionar.
+En Resend → **Domains** → `daily.pantufla.design` → **Configuration**, fijate que el seguimiento de clics y de aperturas (**click tracking** / **open tracking**) esté **apagado**. Viene apagado. Si se prende, Resend reemplaza los links del email por los suyos y Supabase avisa que así los links de confirmación dejan de funcionar.
 
 ## Paso 3. Cuántos emails por hora (Rate Limits)
 
@@ -123,9 +140,9 @@ Además, en **[Authentication → Sign In / Providers → Email](https://supabas
 
 Usá un email tuyo que no tenga cuenta en daily. Con Gmail podés inventar uno nuevo agregando `+` y algo antes de la arroba: `tunombre+prueba1@gmail.com` llega a `tunombre@gmail.com`.
 
-- [ ] En la compu, en una ventana privada, abrí https://daily-nine-ruddy.vercel.app y creá una cuenta de **terapeuta**.
+- [ ] En la compu, en una ventana privada, abrí https://daily.pantufla.design y creá una cuenta de **terapeuta**.
 - [ ] Aparece «Confirmá tu email» con tu dirección.
-- [ ] En el **celular**, abrí el email. Llega de **daily** (`hola@pantufla.design`), con el asunto nuevo, el logo y tu nombre. Si no está en la bandeja de entrada, buscá en Spam o Promociones.
+- [ ] En el **celular**, abrí el email. Llega de **daily** (`no-responder@daily.pantufla.design`), con el asunto nuevo, el logo y tu nombre. Si no está en la bandeja de entrada, buscá en Spam o Promociones.
 - [ ] Tocá **Confirmar mi email**: se abre daily en el celular con «¡Listo, confirmaste tu email!». Tocá **Ir a mi panel** y entrás.
 - [ ] Tocá el mismo botón del email otra vez: tiene que decir «Este link ya no sirve» (cada link sirve una vez).
 - [ ] En la compu, tocá **Ya lo confirmé · Ingresar** e ingresá con la contraseña.
@@ -137,9 +154,9 @@ Si un email no llega: en Resend → **Emails** ves cada envío y si lo entregó 
 
 ---
 
-## Pendiente: la Política de privacidad
+## La Política de privacidad
 
-Cuando Resend empiece a mandar los emails, hay que sumarlo como proveedor en la Política de privacidad (lo que recibe: el email de la persona y el contenido del mensaje). La app ya tiene el lugar previsto: es un cambio chico de código en `src/lib/legal.ts` (`EMAIL_SENDER`), y hay que decidir qué país figura. Resend es una empresa de Estados Unidos y tu dominio envía desde Irlanda (`eu-west-1`); la política hoy dice que los datos se procesan en Brasil y EE. UU. Pedilo junto con la publicación.
+Resend ya figura como proveedor de los emails de la cuenta (`EMAIL_SENDER` en `src/lib/legal.ts`): EE. UU. (la empresa) e Irlanda (desde donde se envían). Si algún día cambiás de servicio de envío o de región, hay que actualizar ese dato y la versión de los textos.
 
 ## Qué no se pudo comprobar
 
